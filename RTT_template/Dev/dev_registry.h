@@ -17,6 +17,7 @@ typedef struct {
     { #_name, _init, _task, _prio, _period, 0, 1 }
 
 int  Dev_Registry_Add(const SysModule_t *module);
+void Dev_RegisterAll(void);   /* 集中注册：adc / cur / vm */
 void Dev_Registry_InitAll(void);
 void Dev_Registry_UpdateAll(void);
 void Dev_Thread_Entry(void *param);

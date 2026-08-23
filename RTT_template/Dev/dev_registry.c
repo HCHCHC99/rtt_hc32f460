@@ -4,6 +4,9 @@
  * @note    参考源工程 sys_sched 的注册语义（注册即 init），task 由 RT-Thread 线程承载
  */
 #include "dev_registry.h"
+#include "dev_adc.h"
+#include "power/current_sensor.h"
+#include "power/bus_voltage.h"
 #include <rtthread.h>
 
 #define MAX_REG_MODULES         (16U)
@@ -58,6 +61,13 @@ void Dev_Thread_Entry(void *param)
         Dev_Registry_UpdateAll();
         rt_thread_mdelay(1);
     }
+}
+
+void Dev_RegisterAll(void)
+{
+    Dev_Adc_Register();
+    CurrentSensor_Register();
+    BusVoltage_Register();
 }
 
 int Dev_Start(void)
