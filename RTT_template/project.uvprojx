@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define>__STDC_LIMIT_MACROS, RT_USING_LIBC, __CLK_TCK=RT_TICK_PER_SECOND, HC32F460, USE_DDL_DRIVER, __RTTHREAD__, RT_USING_ARM_LIBC</Define>
               <Undefine></Undefine>
-              <IncludePath>applications;.;rt-thread\components\libc\compilers\common\include;rt-thread\components\libc\compilers\common\extension;rt-thread\components\libc\compilers\common\extension\fcntl\octal;rt-thread\libcpu\arm\common;rt-thread\libcpu\arm\cortex-m4;rt-thread\components\drivers\include;rt-thread\components\drivers\include;rt-thread\components\drivers\include;rt-thread\components\drivers\spi;rt-thread\components\drivers\include;board;board\ports;board\config;libraries\hc32_drivers;rt-thread\components\finsh;.;rt-thread\include;libraries\hc32f460_ddl\drivers\cmsis\Device\HDSC\hc32f4xx\Include;libraries\hc32f460_ddl\drivers\cmsis\Include;libraries\hc32f460_ddl\drivers\hc32_ll_driver\inc;rt-thread\components\libc\posix\io\poll;rt-thread\components\libc\posix\io\stdio;rt-thread\components\libc\posix\ipc;.\RTT;.\board;.\Adp;.\Dev;.\Utils</IncludePath>
+              <IncludePath>applications;.;rt-thread\components\libc\compilers\common\include;rt-thread\components\libc\compilers\common\extension;rt-thread\components\libc\compilers\common\extension\fcntl\octal;rt-thread\libcpu\arm\common;rt-thread\libcpu\arm\cortex-m4;rt-thread\components\drivers\include;rt-thread\components\drivers\include;rt-thread\components\drivers\include;rt-thread\components\drivers\spi;rt-thread\components\drivers\include;board;board\ports;board\config;libraries\hc32_drivers;rt-thread\components\finsh;.;rt-thread\include;libraries\hc32f460_ddl\drivers\cmsis\Device\HDSC\hc32f4xx\Include;libraries\hc32f460_ddl\drivers\cmsis\Include;libraries\hc32f460_ddl\drivers\hc32_ll_driver\inc;rt-thread\components\libc\posix\io\poll;rt-thread\components\libc\posix\io\stdio;rt-thread\components\libc\posix\ipc;.\RTT;.\board;.\Adp;.\Dev;.\Dev\power;.\Utils</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -777,12 +777,48 @@
         </Group>
         <Group>
           <GroupName>Adp</GroupName>
+          <Files>
+            <File>
+              <FileName>adc_drv.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Adp\adc_drv.c</FilePath>
+            </File>
+          </Files>
         </Group>
         <Group>
           <GroupName>Dev</GroupName>
+          <Files>
+            <File>
+              <FileName>dev_registry.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Dev\dev_registry.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_adc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Dev\dev_adc.c</FilePath>
+            </File>
+            <File>
+              <FileName>current_sensor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Dev\power\current_sensor.c</FilePath>
+            </File>
+            <File>
+              <FileName>bus_voltage.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Dev\power\bus_voltage.c</FilePath>
+            </File>
+          </Files>
         </Group>
         <Group>
           <GroupName>Utils</GroupName>
+          <Files>
+            <File>
+              <FileName>state_engine.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Utils\state_engine.c</FilePath>
+            </File>
+          </Files>
         </Group>
       </Groups>
     </Target>
