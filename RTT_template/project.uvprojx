@@ -709,6 +709,11 @@
               <FilePath>libraries\hc32f460_ddl\drivers\hc32_ll_driver\src\hc32_ll_aos.c</FilePath>
             </File>
             <File>
+              <FileName>hc32_ll_adc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>libraries\hc32f460_ddl\drivers\hc32_ll_driver\src\hc32_ll_adc.c</FilePath>
+            </File>
+            <File>
               <FileName>hc32_ll_sram.c</FileName>
               <FileType>1</FileType>
               <FilePath>libraries\hc32f460_ddl\drivers\hc32_ll_driver\src\hc32_ll_sram.c</FilePath>
