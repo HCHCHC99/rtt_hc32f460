@@ -67,7 +67,7 @@ extern "C"
 #define LL_EFM_ENABLE                               (DDL_ON)
 #define LL_EMB_ENABLE                               (DDL_ON)
 #define LL_ETH_ENABLE                               (DDL_ON)
-#define LL_EVENT_PORT_ENABLE                        (DDL_OFF)
+#define LL_EVENT_PORT_ENABLE                        (DDL_ON)
 #define LL_FCG_ENABLE                               (DDL_ON)
 #define LL_FCM_ENABLE                               (DDL_ON)
 #define LL_FMAC_ENABLE                              (DDL_ON)
@@ -80,7 +80,7 @@ extern "C"
 #define LL_INTERRUPTS_SHARE_ENABLE                  (DDL_ON)
 #define LL_KEYSCAN_ENABLE                           (DDL_ON)
 #define LL_MAU_ENABLE                               (DDL_ON)
-#define LL_MDIO_ENABLE                              (DDL_OFF)
+#define LL_MDIO_ENABLE                              (DDL_ON)
 #define LL_MPU_ENABLE                               (DDL_ON)
 #define LL_NFC_ENABLE                               (DDL_ON)
 #define LL_OTS_ENABLE                               (DDL_ON)
@@ -102,7 +102,7 @@ extern "C"
 #define LL_TRNG_ENABLE                              (DDL_ON)
 #define LL_USART_ENABLE                             (DDL_ON)
 #define LL_USB_ENABLE                               (DDL_OFF)
-#define LL_VREF_ENABLE                              (DDL_OFF)
+#define LL_VREF_ENABLE                              (DDL_ON)
 #define LL_WDT_ENABLE                               (DDL_ON)
 
 /**

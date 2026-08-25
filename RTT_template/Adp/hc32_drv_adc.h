@@ -1,17 +1,25 @@
 /**
- * @file    adc_drv.h
+ * @file    hc32_drv_adc.h
  * @brief   ADC 硬件驱动（HC32F460）— 多实例 + EOCA 中断 + 换算写环形缓冲
- * @note    基于 HB_chuchai v6.0.3 Adc.c/h 裁剪移植（去 DMA；阶段一软件触发）
+ * @note    基于 HB_chuchai v6.0.4 Adc.c/h 裁剪移植（去 DMA；TMR0_1 硬件触发 500us + AOS 事件路由 + EOCA 滑动窗口）
  */
-#ifndef __ADC_DRV_H__
-#define __ADC_DRV_H__
+#ifndef __HC32_DRV_ADC_H__
+#define __HC32_DRV_ADC_H__
 
 #include "hc32_ll.h"
 #include <stdint.h>
 #include <stdbool.h>
 
-/* 采样间隔宏（Task 9 硬件触发时使用；软件触发由 Dev_Adc_Task 周期调用） */
-#define ADC_SAMPLE_INTERVAL_US      (50U)   /* 50us = 20kHz */
+/* ============ 采样触发：TMR0_1 CH_B 硬件触发 + AOS 事件路由 ============ */
+#define ADC_SAMPLE_INTERVAL_US      (500U)            /* 采样间隔 500us = 2kHz */
+#define ADC_TRIG_TMR_UNIT           (CM_TMR0_1)
+#define ADC_TRIG_TMR_CH             (TMR0_CH_B)
+#define ADC_TRIG_TMR_CLK            (FCG2_PERIPH_TMR0_1)
+#define ADC_TRIG_TMR_CLK_DIV        (TMR0_CLK_DIV256)
+#define ADC_TRIG_TMR_DIV_VAL        (256UL)
+#define ADC_TRIG_AOS_SEL            (AOS_ADC1_0)           /* AOS 目标：ADC1 触发输入 0 */
+#define ADC_TRIG_AOS_EVT            (EVT_SRC_TMR0_1_CMP_B) /* AOS 事件源：TMR0_1 CMP_B */
+#define ADC_TRIG_HARD_SEL           (ADC_HARDTRIG_EVT0)    /* ADC SEQ_A 硬件触发选择（内部事件 EVT0） */
 
 /* 环形缓冲容量 */
 #ifndef ADC_DRV_RING_SIZE
@@ -49,16 +57,35 @@ typedef struct {
     float               fLatest;        /* 最近一次换算值 */
     uint16_t            u16LatestRaw;
     uint32_t            u32SampleCount;
+
+    /* 滑动平均窗口（原始值；EOCA 中断维护，1ms 检测 ISR 读均值） */
+    uint32_t           *pu32MeanWin;   /* 指向静态窗口数组（.c 内分配，长度 ADC_MEAN_WINDOW_SAMPLES） */
+    uint32_t            u32MeanSum;
+    uint16_t            u16MeanIdx;
+    uint16_t            u16MeanCnt;
 } adc_drv_inst_t;
 
 /* 接口 */
 int  AdcDrv_Init(const adc_drv_ch_t *pstcChTable, uint8_t u8ChNum, adc_drv_inst_t *pstcInsts);
-void AdcDrv_Start(void);            /* 硬件触发：启动 TMR0（Task 9 后启用） */
+void AdcDrv_Start(void);            /* 硬件触发：启动 TMR0_1 开始 500us 采样 */
 void AdcDrv_SoftwareTrigger(void);  /* 软件触发：ADC_Start 单次（阶段一使用） */
 void AdcDrv_Stop(void);
 uint16_t AdcDrv_GetLatestRaw(uint8_t u8Id);
 float    AdcDrv_GetLatest(uint8_t u8Id);
 uint16_t AdcDrv_ReadRing(uint8_t u8Id, float *pfBuf, uint16_t u16Max);
+float    AdcDrv_GetMean(uint8_t u8Id);       /* 滑动窗口平均（换算后工程值） */
 void     AdcDrv_ADC1_IRQHandler(void);   /* EOCA 中断入口（DDL 分发） */
 
-#endif /* __ADC_DRV_H__ */
+/* ==================== dev_adc_ops 接口表（Dev 层注入用） ==================== */
+#define HC32_ADC_MAX_INST       (4U)
+
+struct dev_adc_ops;   /* 前向声明，避免依赖 Dev 层头文件 */
+extern const struct dev_adc_ops hc32_adc_ops;
+
+#endif /* __HC32_DRV_ADC_H__ */
+
+
+
+
+
+

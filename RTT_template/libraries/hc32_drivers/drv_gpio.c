@@ -257,6 +257,11 @@ static void hc32_pin_mode(struct rt_device *device, rt_base_t pin, rt_base_t mod
         break;
     }
     GPIO_Init(GPIO_PORT(pin), GPIO_PIN(pin), &stcGpioInit);
+    GPIO_SetFunc(GPIO_PORT(pin), GPIO_PIN(pin), GPIO_FUNC_0);
+    if ((PIN_MODE_OUTPUT == mode) || (PIN_MODE_OUTPUT_OD == mode))
+    {
+        GPIO_OutputCmd(GPIO_PORT(pin), GPIO_PIN(pin), ENABLE);
+    }
 }
 
 static void hc32_pin_write(struct rt_device *device, rt_base_t pin, rt_base_t value)
@@ -506,3 +511,4 @@ int rt_hw_pin_init(void)
 INIT_BOARD_EXPORT(rt_hw_pin_init);
 
 #endif  /* RT_USING_PIN */
+

@@ -6,6 +6,10 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-#include "rtt_log.h"
+#include "RTT/rtt_log.h"
+#include "Adp/hc32_drv_gpio.h"
 
 #endif
+
+
+
