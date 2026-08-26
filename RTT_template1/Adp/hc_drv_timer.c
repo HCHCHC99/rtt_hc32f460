@@ -148,13 +148,18 @@ void Print_All_Clock_Freq(void)
     stc_clock_freq_t stcClkFreq;
 
     if (LL_OK == CLK_GetClockFreq(&stcClkFreq)) {
-        MAIN_D("[CLK] SYSCLK=%u HCLK=%u PCLK0=%u PCLK1=%u PCLK2=%u PCLK3=%u PCLK4=%u EXCLK=%u",
-               (unsigned)stcClkFreq.u32SysclkFreq, (unsigned)stcClkFreq.u32HclkFreq,
-               (unsigned)stcClkFreq.u32Pclk0Freq, (unsigned)stcClkFreq.u32Pclk1Freq,
-               (unsigned)stcClkFreq.u32Pclk2Freq, (unsigned)stcClkFreq.u32Pclk3Freq,
-               (unsigned)stcClkFreq.u32Pclk4Freq, (unsigned)stcClkFreq.u32ExclkFreq);
+        MAIN_D("[CLK] ==========================================");
+        MAIN_D("[CLK] SYSCLK=%u\n", (unsigned)stcClkFreq.u32SysclkFreq);
+        MAIN_D("[CLK] HCLK=%u\n", (unsigned)stcClkFreq.u32HclkFreq);
+        MAIN_D("[CLK] PCLK0=%u\n", (unsigned)stcClkFreq.u32Pclk0Freq);
+        MAIN_D("[CLK] PCLK1=%u\n", (unsigned)stcClkFreq.u32Pclk1Freq);
+        MAIN_D("[CLK] PCLK2=%u\n", (unsigned)stcClkFreq.u32Pclk2Freq);
+        MAIN_D("[CLK] PCLK3=%u\n", (unsigned)stcClkFreq.u32Pclk3Freq);
+        MAIN_D("[CLK] PCLK4=%u\n", (unsigned)stcClkFreq.u32Pclk4Freq);
+        MAIN_D("[CLK] EXCLK=%u\n", (unsigned)stcClkFreq.u32ExclkFreq);
+        MAIN_D("[CLK] ==========================================");
     } else {
-        MAIN_D("[CLK] GetClockFreq failed");
+        MAIN_D("[CLK] GetClockFreq failed\n");
     }
 }
 

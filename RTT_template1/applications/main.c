@@ -31,6 +31,7 @@
 #include "Task/led_task.h"
 #include "Task/di_task.h"
 #include "Task/rod_task.h"
+#include "Task/task_stack.h"
 #include "Dev/dev_act/dev_act.h"
 
 
@@ -123,6 +124,8 @@ int main(void)
     Di_Task_Start();     /* DI 采集任务（10ms：电源极性扫描，事件在设备内发） */
     Act_Arbitrator_Init();    /* 仲裁占位：方向 g_act_dir（Watch 可改） */
     Rod_Task_Start();         /* 推杆位置/状态 10ms 更新 */
+
+    Task_Stack_Dump();          /* 打印各线程栈大小 + 总栈 + 堆余量 */
 
 
     while (1)

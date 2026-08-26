@@ -5,9 +5,11 @@
 #ifndef __ROD_TASK_H__
 #define __ROD_TASK_H__
 
+#include "Task/task_stack.h"   /* 栈大小统一管理 */
+
 /* 默认配置宏（统一放头文件） */
 #define ROD_SCAN_PERIOD_MS    (10U)     /* 推杆位置/状态更新周期 ms */
-#define ROD_THREAD_STACK      (1024U)   /* 含 float + RTT 打印 + 中断嵌套 */
+#define ROD_THREAD_STACK      TASK_STACK_ROD   /* 引用 task_stack.h 唯一来源 */
 #define ROD_THREAD_PRIO       (20)      /* 中高优先级，早于 DI/LED/监控 */
 #define ROD_THREAD_TICK       (10)
 
@@ -15,4 +17,3 @@
 void Rod_Task_Start(void);
 
 #endif /* __ROD_TASK_H__ */
-

@@ -20,6 +20,7 @@
 #define QUEUE_INIT_PRINT_EN     0   /* 队列初始化（示例，默认关闭） */
 #define MONITOR_SYS_PRINT_EN    1   /* 系统1s打印 */
 #define RTT_PRINTF_EN          1   /* RT-Thread rt_kprintf 重定向到 RTT（rt_hw_console_output） */
+#define TASK_STACK_PRINT_EN     1   /* 任务栈统一管理：各线程栈大小/总栈/堆余量 */
 /* ===================== 各模块打印宏封装 ===================== */
 #if SYS_STATE_PRINT_EN
 #define SYS_STATE_PRINT(fmt, ...)   MAIN_D("[SYS_STATE] " fmt, ##__VA_ARGS__)
@@ -79,6 +80,12 @@
 #define MONITOR_SYS_PRINT(fmt, ...)     MAIN_D("[SYS_MON] " fmt, ##__VA_ARGS__)
 #else
 #define MONITOR_SYS_PRINT(fmt, ...)     ((void)0)
+#endif
+
+#if TASK_STACK_PRINT_EN
+#define TASK_STACK_PRINT(fmt, ...)     MAIN_D("[TASK_STACK] " fmt, ##__VA_ARGS__)
+#else
+#define TASK_STACK_PRINT(fmt, ...)     ((void)0)
 #endif
 
 /* 打印当前开关状态（调试用） */
