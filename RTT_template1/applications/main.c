@@ -96,6 +96,8 @@ static void monitor_sample_1s(void)
     /* 设备层：电流传感器均值 + 母线电压均值（电压已含 VOL_OFFSET 偏置） */
     MONITOR_PRINT("dev: t=%uus cur=%u.%01umA vol=%umV",
                   t_us, c_avg_i, c_avg_d, v_avg_mv);
+
+    Task_Stack_Monitor();      /* 1s：栈哨兵水位监控，超 75% 才打印 */
 }
 volatile int test = 0;
 int main(void)
