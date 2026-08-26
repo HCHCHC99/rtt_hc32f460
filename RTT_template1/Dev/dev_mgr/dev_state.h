@@ -22,6 +22,7 @@ typedef enum {
 #define SYS_ERR_OVER_CURRENT     1U
 #define SYS_ERR_VOLT_OVER        2U
 #define SYS_ERR_VOLT_UNDER       3U
+#define SYS_ERR_ROD_LIMIT        4U   /* 推杆上下霍尔故障 */
 
 /* 系统状态机初始化：填表 + 初始化（原样移植） */
 void Sys_State_Init(StateMachine_t *sm);
@@ -36,6 +37,7 @@ void Sys_Event_Send(rt_uint32_t bits);
 void Sys_State_Recover(void);
 
 #endif /* __DEV_STATE_H__ */
+
 
 
 

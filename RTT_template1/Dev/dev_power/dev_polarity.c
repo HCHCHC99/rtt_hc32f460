@@ -16,9 +16,6 @@
 #include <rtdevice.h>
 
 /* ============ 引脚与窗口参数 ============ */
-#define POWER_DIR_P_PIN     GET_PIN(B, 13)   /* 正极线检测 */
-#define POWER_DIR_N_PIN     GET_PIN(B, 12)   /* 负极线检测 */
-#define POLARITY_WIN_SIZE   (5U)             /* 各 5 点窗口：di_task 2ms 采样 => 10ms 消抖 */
 
 /* 双窗口：位掩码（bit0 最新）+ 已填点数 */
 typedef struct {

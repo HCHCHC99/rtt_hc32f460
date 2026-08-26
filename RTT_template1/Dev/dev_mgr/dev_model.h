@@ -8,6 +8,13 @@
 #define __DEV_MODEL_H__
 
 #include "Utils/state_engine.h"
+#include "Dev/dev_rod/dev_rod_position.h"
+#include "Dev/dev_rod/dev_rod_state.h"
+
+/* 系统状态机线程配置（统一放头文件） */
+#define SYS_SM_THREAD_STACK   2048
+#define SYS_SM_THREAD_PRIO    22
+#define SYS_SM_THREAD_TICK    10
 #include <rtthread.h>
 
 /* 最大轴数（多轴预留：与控制器工程 MAX_AXIS_NUM 一致） */
@@ -27,6 +34,8 @@ typedef struct {
     AxisDir_t      dir;                /* ACT_DIR_NONE 表示未配置 */
     StateMachine_t sm_act;             /* 推杆状态机（预留，暂不挂表） */
     rt_event_t     evt_act;            /* 推杆事件组（预留：系统层向轴下发事件） */
+    RodPosition_t  position;             /* 推杆位置模块 */
+    RodStateCtx_t  state;                /* 推杆状态模块上下文 */
 } Axis_t;
 
 /* 顶层系统对象（对应控制器工程 System_t 的最小裁剪版，已预留多轴） */
@@ -34,6 +43,8 @@ typedef struct {
     StateMachine_t sys_sm;             /* 系统状态机 */
     rt_event_t     sys_evt;            /* 系统事件集 */
     uint32_t       error_code;         /* 系统故障码：0=无 1=过流 2=过压 3=欠压 */
+    uint32_t       fault_bits;         /* 故障位图：bit0 过流 bit1 过压 bit2 欠压；全清才自动恢复 */
+    State_t        prev_state;        /* 故障前状态（恢复时回跳：RUN->RUN，否则->IDLE） */
     Axis_t         axis[MAX_AXIS_NUM]; /* 多轴预留 */
 } System_t;
 
@@ -49,6 +60,8 @@ void Sys_Sm_Thread_Start(void);
 void Act_Event_Send(rt_uint32_t bits);
 
 #endif /* __DEV_MODEL_H__ */
+
+
 
 
 

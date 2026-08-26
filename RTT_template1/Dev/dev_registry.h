@@ -3,6 +3,12 @@
 
 #include <stdint.h>
 
+/* 配置宏（统一放头文件） */
+#define MAX_REG_MODULES         (16U)
+#define DEV_THREAD_STACK_SIZE   (2048U)
+#define DEV_THREAD_PRIORITY     (20)
+#define DEV_THREAD_TICK         (10)
+
 typedef struct {
     const char *name;
     void (*init)(void);

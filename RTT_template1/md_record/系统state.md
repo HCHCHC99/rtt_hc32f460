@@ -69,7 +69,7 @@ uint32_t error_code;   /* 故障码：0=无 1=过流 2=过压 3=欠压 */
   - 恢复正常（`s_u8Fault: 2/1→0`）→ **不发事件**（恢复路径为手动 `Sys_State_Recover()`）
 - `dev_cur_sensor.c`：
   - 过流跳变（`s_u8Status: 0→1`）→ `Sys_Event_Send(EVT_SYS_OVER_CURRENT)`
-  - 恢复正常（`1→0`）→ **不发事件**（手动恢复）
+  - 恢复正常（`1→0`）→ 不发事件（过流仍手动恢复）
 
 依赖方向：`dev_power → dev_mgr`（设备层通知管理层故障），需 include `dev_state.h` / `dev_event_def.h`。
 
@@ -96,7 +96,7 @@ uint32_t error_code;   /* 故障码：0=无 1=过流 2=过压 3=欠压 */
 
 ## 五、已确认决策（2026-08-25）
 
-1. **恢复方式：手动恢复**。提供 `Sys_State_Recover()` 回调（清故障码 + 发 `EVT_SYS_RECOVERY`），触发方式（MSH/按键）后续再定。
+1. **恢复方式（2026-08-26 更新）**：电压故障**自动恢复**（迟滞 1V + 延时后发 `EVT_SYS_VOLT_NORMAL`，故障位图清空 → FAULT→IDLE）；过流仍**手动** `Sys_State_Recover()`。
 2. **过压 / 欠压 / 过流 → EMERGENCY**；`sys_enter_emergency` 末尾**跳入 FAULT**（急停动作后进入稳定故障态）。
 3. **`System_t` 增加 `error_code` 故障码字段**：0=无 1=过流 2=过压 3=欠压。
 4. **`enter_fault` 动作**：记故障码 + 打印（先不接真实设备）。
@@ -142,3 +142,19 @@ EMERGENCY --RECOVERY--> IDLE
 
 
 - 采样/检测机制升级（2026-08-25）：ADC 改 TMR0_1 硬件触发 500us/2kHz（AOS 事件路由 + EOCA 滑动窗口），检测改 TMR0_2 1ms ISR（详见 移植电压电流.md 第 8 节）。
+
+
+### 2026-08-26 追加：阈值 RAM 化 + 电压自动恢复
+- 阈值从宏改为 RAM 配置变量：`g_volt_cfg`（over_th/under_th/hyst/recover_ms，迟滞默认 **1V**）、`g_cur_cfg`（over_th_ma/window_ms）；debugger 改变量实时生效，重启回默认；
+- `System_t.fault_bits`：bit0 过流 bit1 过压 bit2 欠压；故障置位、电压正常清电压位、**全清才自动恢复**、手动恢复全清；
+- 电压恢复正常（过迟滞+延时）→ 设备发 `EVT_SYS_VOLT_NORMAL` → 状态机自动 `FAULT→IDLE`；过流仍手动。
+
+### 2026-08-26 追加②：初始化移入 IDLE + 恢复回故障前状态
+- 设备初始化由 main 移到 `sys_enter_idle()`：`Dev_Registry_InitAll()` 每次进 IDLE 执行（上电一次初始化；故障恢复/回 IDLE 清业务状态）；main 去掉相同初始化，避免上电两次；
+- 硬件触发只启动一次（首次进 IDLE：`HcDrv_Timer_Start1ms(Dev_Power_Isr1ms)` + `Dev_Adc_Start()`），后续回 IDLE 不重复启动；
+- `System_t.prev_state`：首次故障时记录故障前状态；电压自动恢复/手动恢复均**回到故障前状态**（RUN->RUN，否则->IDLE）。
+
+### 2026-08-26 追加③：恢复延时 500ms + 极性重发（接受）
+- 电压恢复延时默认 **3000ms -> 500ms**（`VOL_RECOVER_DELAY_MS_DFT (500U)`，运行时 `g_volt_cfg.recover_ms`）；
+- 配置默认宏统一移到 .h（bus_voltage/cur_sensor/polarity/di_task/led_task 的 .h）；
+- **确认（A）**：故障恢复回到 IDLE 时，`Dev_Registry_InitAll` 会把极性复位为 UNKNOWN，di_task 约 10ms 后重新判出 FWD 并**再发一次 EVT_ACT_POLARITY_FWD**——无害（轴事件组位本来就置着，属再次确认；系统状态机不受影响），接受此行为。

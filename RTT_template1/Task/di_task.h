@@ -6,7 +6,15 @@
 #ifndef __DI_TASK_H__
 #define __DI_TASK_H__
 
+/* 默认配置宏（统一放头文件） */
+#define DI_SCAN_PERIOD_MS    (2U)     /* DI 采样周期 ms：2ms */
+#define DI_THREAD_STACK      (1024U)
+#define DI_THREAD_PRIO       (22)     /* 中优先级，早于低优先级的 LED/监控 */
+#define DI_THREAD_TICK       (10)
+
 /* 初始化并启动 DI 采集线程 */
 void Di_Task_Start(void);
 
 #endif /* __DI_TASK_H__ */
+
+

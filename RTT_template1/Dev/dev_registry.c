@@ -12,12 +12,9 @@
 #include "Dev/dev_power/dev_cur_sensor.h"
 #include "Dev/dev_power/dev_bus_voltage.h"
 #include "Dev/dev_power/dev_polarity.h"
+#include "Dev/dev_monitor/dev_monitor.h"
 #include <rtthread.h>
 
-#define MAX_REG_MODULES         (16U)
-#define DEV_THREAD_STACK_SIZE   (2048U)
-#define DEV_THREAD_PRIORITY     (20)
-#define DEV_THREAD_TICK         (10)
 
 static SysModule_t s_modules[MAX_REG_MODULES];
 static uint16_t    s_module_num = 0U;
@@ -34,15 +31,17 @@ int Dev_Registry_Add(const SysModule_t *module)
     }
     s_modules[s_module_num++] = *module;
     DEV_REG_PRINT("register %s", module->name);
-    if (module->init != RT_NULL) {
-        module->init();
-    }
     return 0;
 }
 
 void Dev_Registry_InitAll(void)
 {
-    /* init 在 Dev_Registry_Add 时已执行；本接口保留供显式初始化阶段使用 */
+    /* 统一初始化/复位所有已注册模块：sys_enter_idle 每次进 IDLE 调用（上电一次 + 恢复时清业务状态） */
+    for (uint16_t i = 0U; i < s_module_num; i++) {
+        if (s_modules[i].init != RT_NULL) {
+            s_modules[i].init();
+        }
+    }
 }
 
 void Dev_Registry_UpdateAll(void)
@@ -96,6 +95,13 @@ void Dev_RegisterAll(void)
     Dev_Registry_Add(&s_pol_module);
 
 #endif
+#if DEV_ENABLE_MONITOR
+    /* B 模式：registry 线程按 period 调 Monitor_Task 刷新 g_monitor（Watch 用） */
+    static const SysModule_t s_monitor_module =
+        SYS_MODULE_REGISTER("monitor", Monitor_Init, Monitor_Task, DEV_PRIO_MONITOR, 100);
+    Dev_Registry_Add(&s_monitor_module);
+#endif
+
 } 
 
 int Dev_Start(void)

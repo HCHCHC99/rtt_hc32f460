@@ -8,10 +8,6 @@
 #include "Dev/dev_power/dev_polarity.h"
 #include <rtthread.h>
 
-#define DI_SCAN_PERIOD_MS    (2U)     /* 2ms 采样周期：5 点窗口 => 10ms 消抖 */
-#define DI_THREAD_STACK      (1024U)
-#define DI_THREAD_PRIO       (22)     /* 中优先级，早于低优先级的 LED/监控 */
-#define DI_THREAD_TICK       (10)
 
 static void di_thread_entry(void *param)
 {

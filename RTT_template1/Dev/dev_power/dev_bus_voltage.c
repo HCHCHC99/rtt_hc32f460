@@ -9,11 +9,11 @@
 #include "Dev/dev_adc/dev_adc.h"
 #include <rtthread.h>
 
-#define VOL_OVER_TH          (23.0f)   /* 过压阈值 V */
-#define VOL_UNDER_TH         (0.0f)    /* 欠压阈值 V */
-#define VOL_HYST             (2.0f)    /* 迟滞回差 V */
-#define VOL_RECOVER_DELAY_MS (3000U)   /* 恢复延时 ms（1ms 计数） */
-#define VOL_OFFSET           (1200.0f) /* 偏置电压 mV：1200mV = 1.2V（仅加在本模块，不影响 ADC 层） */
+
+/* 阈值配置全局变量（类型/声明见 dev_bus_voltage.h；debugger 改 g_volt_cfg 实时生效） */
+volatile VoltCfg_t g_volt_cfg = {
+    VOL_OVER_TH_DFT, VOL_UNDER_TH_DFT, VOL_HYST_DFT, VOL_RECOVER_DELAY_MS_DFT,
+};
 
 static volatile float   s_fVolt;       /* 1ms ISR 写，主循环/GetInfo 读 */
 static volatile uint8_t s_u8Status;    /* 0 正常 1 欠压 2 过压 */
@@ -45,15 +45,15 @@ void BusVoltage_Isr1ms(void)
     u8PrevFault = s_u8Fault;
 
     if (s_u8Fault != 0U) {
-        uint8_t u8Recover = (s_u8Fault == 2U) ? (fVolt < (VOL_OVER_TH - VOL_HYST))
-                                              : (fVolt > (VOL_UNDER_TH + VOL_HYST));
+        uint8_t u8Recover = (s_u8Fault == 2U) ? (fVolt < (g_volt_cfg.over_th - g_volt_cfg.hyst))
+                                              : (fVolt > (g_volt_cfg.under_th + g_volt_cfg.hyst));
         if (u8Recover != 0U) {
             if (s_u8Waiting == 0U) {
                 s_u8Waiting = 1U;
                 s_u32RecoverCnt = 0U;
             } else {
                 s_u32RecoverCnt++;
-                if (s_u32RecoverCnt >= VOL_RECOVER_DELAY_MS) {
+                if (s_u32RecoverCnt >= g_volt_cfg.recover_ms) {
                     s_u8Fault = 0U;
                     s_u8Waiting = 0U;
                     s_u32RecoverCnt = 0U;
@@ -64,20 +64,22 @@ void BusVoltage_Isr1ms(void)
             s_u32RecoverCnt = 0U;
         }
     } else {
-        if (fVolt > VOL_OVER_TH) {
+        if (fVolt > g_volt_cfg.over_th) {
             s_u8Fault = 2U;
-        } else if (fVolt < VOL_UNDER_TH) {
+        } else if (fVolt < g_volt_cfg.under_th) {
             s_u8Fault = 1U;
         }
     }
     s_u8Status = s_u8Fault;
 
-    /* 故障跳变 -> 事件通知系统状态机（恢复不自动发事件，手动恢复；打印在 sys_sm 线程） */
+    /* 故障/恢复跳变 -> 事件通知系统状态机（恢复发 EVT_SYS_VOLT_NORMAL，由状态机判自动恢复；打印在 sys_sm 线程） */
     if (s_u8Fault != u8PrevFault) {
         if (s_u8Fault == 2U) {
             Sys_Event_Send(EVT_SYS_VOLT_OVER);
         } else if (s_u8Fault == 1U) {
             Sys_Event_Send(EVT_SYS_VOLT_UNDER);
+        } else {
+            Sys_Event_Send(EVT_SYS_VOLT_NORMAL);   /* 电压恢复正常（过迟滞+恢复延时） */
         }
     }
 }
@@ -89,6 +91,8 @@ void BusVoltage_GetInfo(float *pfVolt_V, uint8_t *pu8Status)
 }
 
 /* EOF */
+
+
 
 
 

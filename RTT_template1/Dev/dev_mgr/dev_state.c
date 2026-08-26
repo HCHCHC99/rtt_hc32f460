@@ -11,6 +11,10 @@
 #include "dev_model.h"
 #include "rtt_manager.h"
 #include "Utils/us_timer.h"
+#include "Dev/dev_registry.h"
+#include "Adp/hc_drv_timer.h"
+#include "Dev/dev_adc/dev_adc.h"
+#include "Dev/dev_power/dev_power_isr.h"
 #include <rtthread.h>
 
 /* 状态入口函数声明 */
@@ -20,8 +24,6 @@ static void sys_enter_run(void);
 static void sys_enter_stop(void);
 static void sys_enter_fault(void);
 static void sys_enter_emergency(void);
-
-/* 系统状态跳转表 */
 static const StateJumpTable_t sys_jump[] = {
     {SYS_STATE_INIT,        EVT_SYS_INIT_DONE,             SYS_STATE_IDLE},
 
@@ -32,6 +34,7 @@ static const StateJumpTable_t sys_jump[] = {
     {SYS_STATE_IDLE,        EVT_SYS_VOLT_OVER,             SYS_STATE_EMERGENCY},
     {SYS_STATE_IDLE,        EVT_SYS_VOLT_UNDER,            SYS_STATE_EMERGENCY},
     {SYS_STATE_IDLE,        EVT_SYS_OVER_CURRENT,          SYS_STATE_EMERGENCY},
+    {SYS_STATE_IDLE,        EVT_SYS_ROD_LIMIT_FAULT,       SYS_STATE_EMERGENCY},
 
     {SYS_STATE_RUN,         EVT_SYS_FAULT,                 SYS_STATE_FAULT},
     {SYS_STATE_RUN,         EVT_SYS_EMERGENCY,             SYS_STATE_EMERGENCY},
@@ -39,6 +42,7 @@ static const StateJumpTable_t sys_jump[] = {
     {SYS_STATE_RUN,         EVT_SYS_VOLT_OVER,             SYS_STATE_EMERGENCY},
     {SYS_STATE_RUN,         EVT_SYS_VOLT_UNDER,            SYS_STATE_EMERGENCY},
     {SYS_STATE_RUN,         EVT_SYS_OVER_CURRENT,          SYS_STATE_EMERGENCY},
+    {SYS_STATE_RUN,         EVT_SYS_ROD_LIMIT_FAULT,       SYS_STATE_EMERGENCY},
 
     {SYS_STATE_STOP,        EVT_SYS_CMD_WORK_ENABLE,       SYS_STATE_RUN},
     {SYS_STATE_STOP,        EVT_SYS_RECOVERY,              SYS_STATE_IDLE},
@@ -76,16 +80,28 @@ void Sys_State_Dispatch(rt_uint32_t bits)
        检测在 1ms ISR 完成，打印挪到本线程上下文（ISR 不打印） */
     if (bits & EVT_SYS_OVER_CURRENT) {
         mySystem.error_code = SYS_ERR_OVER_CURRENT;
+        if (mySystem.fault_bits == 0U) { mySystem.prev_state = (State_t)StateMachine_GetState(&mySystem.sys_sm); }
+        mySystem.fault_bits |= (1U << 0);   /* 过流故障置位 */
         POWER_PRINT("over curr");
         StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_OVER_CURRENT);
+    if (bits & EVT_SYS_ROD_LIMIT_FAULT) {
+        mySystem.error_code = SYS_ERR_ROD_LIMIT;
+        mySystem.fault_bits |= (1U << 3);   /* 推杆上下霍尔故障置位 */
+        ROD_PRINT("rod limit fault");
+        StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_ROD_LIMIT_FAULT);
+    }
     }
     if (bits & EVT_SYS_VOLT_OVER) {
         mySystem.error_code = SYS_ERR_VOLT_OVER;
+        if (mySystem.fault_bits == 0U) { mySystem.prev_state = (State_t)StateMachine_GetState(&mySystem.sys_sm); }
+        mySystem.fault_bits |= (1U << 1);   /* 过压故障置位 */
         POWER_PRINT("over volt");
         StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_VOLT_OVER);
     }
     if (bits & EVT_SYS_VOLT_UNDER) {
         mySystem.error_code = SYS_ERR_VOLT_UNDER;
+        if (mySystem.fault_bits == 0U) { mySystem.prev_state = (State_t)StateMachine_GetState(&mySystem.sys_sm); }
+        mySystem.fault_bits |= (1U << 2);   /* 欠压故障置位 */
         POWER_PRINT("under volt");
         StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_VOLT_UNDER);
     }
@@ -93,7 +109,20 @@ void Sys_State_Dispatch(rt_uint32_t bits)
     if (bits & EVT_SYS_EMERGENCY)     StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_EMERGENCY);
     if (bits & EVT_SYS_RECOVERY) {
         mySystem.error_code = SYS_ERR_NONE;
+        mySystem.fault_bits = 0U;   /* 手动恢复清全部故障位 */
         StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_RECOVERY);
+    }
+    /* 电压恢复正常：清电压故障位；全部故障清除 -> 自动恢复（FAULT/EMERGENCY -> IDLE） */
+    if (bits & EVT_SYS_VOLT_NORMAL) {
+        mySystem.fault_bits &= ~((1U << 1) | (1U << 2));   /* 清过压/欠压位 */
+        if (mySystem.fault_bits == 0U) {
+            mySystem.error_code = SYS_ERR_NONE;
+            POWER_PRINT("volt normal, auto recover");
+            StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_RECOVERY);
+        if (mySystem.prev_state == (State_t)SYS_STATE_RUN) {
+            StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_CMD_WORK_ENABLE);   /* 回故障前状态：RUN */
+        }
+        }
     }
     if (bits & EVT_SYS_INIT_DONE)     StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_INIT_DONE);
     if (bits & EVT_SYS_CMD_WORK_ENABLE) StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_CMD_WORK_ENABLE);
@@ -109,9 +138,13 @@ void Sys_Event_Send(rt_uint32_t bits)
 
 void Sys_State_Recover(void)
 {
-    /* 手动恢复：清故障码 + 回 IDLE；如需回 RUN 再发 EVT_SYS_CMD_WORK_ENABLE */
+    /* 手动恢复：清码/故障位 + 回故障前状态（RUN->RUN，否则->IDLE） */
     mySystem.error_code = SYS_ERR_NONE;
+    mySystem.fault_bits = 0U;
     Sys_Event_Send(EVT_SYS_RECOVERY);
+    if (mySystem.prev_state == (State_t)SYS_STATE_RUN) {
+        Sys_Event_Send(EVT_SYS_CMD_WORK_ENABLE);
+    }
 }
 
 /* 状态跳转打印：更新并输出全局 us 时间戳 */
@@ -128,7 +161,18 @@ static void sys_enter_init(void)
 }
 static void sys_enter_idle(void)
 {
+    static uint8_t s_hw_started = 0U;
     sys_state_log_enter("IDLE");
+
+    /* 业务初始化/复位：每次进 IDLE 统一执行（上电一次初始化；故障恢复/回 IDLE 时清业务状态） */
+    Dev_Registry_InitAll();
+
+    /* 硬件触发只启动一次（首次进 IDLE；后续回 IDLE 不重复启动硬件） */
+    if (s_hw_started == 0U) {
+        HcDrv_Timer_Start1ms(Dev_Power_Isr1ms);   /* TMR0_2：1ms 检测心跳 */
+        Dev_Adc_Start();                            /* TMR0_1：启动 500us 采样 */
+        s_hw_started = 1U;
+    }
 }
 static void sys_enter_run(void)
 {
@@ -170,6 +214,7 @@ static void sys_enter_emergency(void)
 }
 
 /* EOF */
+
 
 
 

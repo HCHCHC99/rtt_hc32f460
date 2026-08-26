@@ -50,7 +50,22 @@ int     HcDrv_Timer_Start1ms(void (*pfnCb)(void));
 struct us_timer_ops;
 extern const struct us_timer_ops hc_us_timer_ops;
 
+
+/* 配置宏（统一放头文件） */
+#define TMR6_DIV_VAL          64u     /* TMR6 定时器分频值 */
+#define TMR6_PERIOD_MAX       0xFFFFu /* 16 位定时器最大值 */
+
+/* 1ms 检测心跳（TMR0_2 CH_A）配置 */
+#define TMR0_1MS_UNIT       (CM_TMR0_2)
+#define TMR0_1MS_CH         (TMR0_CH_A)
+#define TMR0_1MS_CLK        (FCG2_PERIPH_TMR0_2)
+#define TMR0_1MS_CLK_DIV    (TMR0_CLK_DIV64)
+#define TMR0_1MS_DIV_VAL    (64UL)
+#define TMR0_1MS_IRQ_SRC    (INT_SRC_TMR0_2_CMP_A)
+#define TMR0_1MS_IRQn       (INT007_IRQn)
+#define TMR0_1MS_INT_PRIO   (DDL_IRQ_PRIO_03)
 #endif /* __HC_DRV_TIMER_H__ */
+
 
 
 

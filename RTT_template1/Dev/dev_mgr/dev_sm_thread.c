@@ -10,13 +10,7 @@
 #include <rtthread.h>
 
 /* 线程等待的系统事件位（与 sys_jump 表使用的事件一致） */
-#define SYS_SM_WAIT_EVENTS \
-    (EVT_SYS_INIT_DONE | EVT_SYS_CMD_WORK_ENABLE | EVT_SYS_FAULT | EVT_SYS_EMERGENCY | \
-     EVT_SYS_RECOVERY | EVT_SYS_VOLT_OVER | EVT_SYS_VOLT_UNDER | EVT_SYS_OVER_CURRENT | EVT_SYS_ST_WORK_ERROR)
 
-#define SYS_SM_THREAD_STACK   1024
-#define SYS_SM_THREAD_PRIO    22
-#define SYS_SM_THREAD_TICK    10
 
 static void sys_sm_thread_entry(void *param)
 {
@@ -48,6 +42,8 @@ void Sys_Sm_Thread_Start(void)
 }
 
 /* EOF */
+
+
 
 
 

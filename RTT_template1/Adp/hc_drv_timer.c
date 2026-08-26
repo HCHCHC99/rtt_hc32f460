@@ -10,8 +10,6 @@
 #include "hc32_ll_tmr0.h"
 #include <rtthread.h>
 
-#define TMR6_DIV_VAL          64u     /* 定时器分频值 */
-#define TMR6_PERIOD_MAX       0xFFFFu /* 16 位定时器最大值 */
 
 /* 全局变量 */
 static uint32_t m_u32TimerFreq = 0;        /* Timer6 实际计数频率 Hz */
@@ -181,14 +179,6 @@ const struct us_timer_ops hc_us_timer_ops = {
 };
 
 /* ==================== 1ms 检测心跳（TMR0_2 CH_A） ==================== */
-#define TMR0_1MS_UNIT       (CM_TMR0_2)
-#define TMR0_1MS_CH         (TMR0_CH_A)
-#define TMR0_1MS_CLK        (FCG2_PERIPH_TMR0_2)
-#define TMR0_1MS_CLK_DIV    (TMR0_CLK_DIV64)
-#define TMR0_1MS_DIV_VAL    (64UL)
-#define TMR0_1MS_IRQ_SRC    (INT_SRC_TMR0_2_CMP_A)
-#define TMR0_1MS_IRQn       (INT007_IRQn)
-#define TMR0_1MS_INT_PRIO   (DDL_IRQ_PRIO_03)
 
 static void (*s_pfn1msCb)(void) = NULL;
 

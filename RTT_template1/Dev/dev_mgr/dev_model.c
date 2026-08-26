@@ -21,6 +21,8 @@ void App_Model_Init(void)
 
     /* 2. 系统事件集：替代原 EventGroup_Create */
     mySystem.sys_evt = rt_event_create("sys_evt", RT_IPC_FLAG_FIFO);
+    mySystem.fault_bits = 0U;   /* 故障位图清零 */
+    mySystem.prev_state  = (State_t)SYS_STATE_INIT;
     RT_ASSERT(mySystem.sys_evt != RT_NULL);
 
     /* 3. 轴对象初始化（多轴预留） */
@@ -32,6 +34,11 @@ void App_Model_Init(void)
         ax->dir = ACT_DIR_NONE;   /* 默认未配置；实际应来自机型/标定数据 */
         rt_snprintf(name, sizeof(name), "act%d_evt", i);
         ax->evt_act = rt_event_create(name, RT_IPC_FLAG_FIFO);
+
+        /* 推杆位置 + 状态模块初始化（表驱动挂 sm_act；行程1000/减速比10/每转12脉冲/导程10/容差3） */
+        RodPosition_Init(&ax->position);
+        RodPosition_SetParams(&ax->position, 1000.0f, 10.0f, 12.0f, 10.0f, 3.0f);
+        RodState_Init(&ax->sm_act, &ax->state, (uint8_t)i, &ax->position);
         RT_ASSERT(ax->evt_act != RT_NULL);
         /* sm_act 暂不挂表（Route B 调 Act_State_Init），保持清零即可 */
     }
@@ -51,5 +58,7 @@ void Act_Event_Send(rt_uint32_t bits)
 }
 
 /* EOF */
+
+
 
 

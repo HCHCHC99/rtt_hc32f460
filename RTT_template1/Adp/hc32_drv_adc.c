@@ -10,22 +10,6 @@
 #include <rtthread.h>
 #include <string.h>
 
-/* ============ 调试宏 ============ */
-#ifdef ADC_DRV_DEBUG_ENABLE
-#define ADC_DRV_DBG(fmt, ...)   rt_kprintf("[ADC_DRV] " fmt "\r\n", ##__VA_ARGS__)
-#else
-#define ADC_DRV_DBG(fmt, ...)   ((void)0)
-#endif
-
-/* ============ 硬件定义 ============ */
-#define ADC_UNIT            (CM_ADC1)
-#define ADC_PERIPH_CLK      (FCG3_PERIPH_ADC1)
-#define ADC_VREF            (3.3F)
-#define ADC_RES             (12U)
-#define ADC_SEQA_INT_SRC    (INT_SRC_ADC1_EOCA)
-#define ADC_SEQA_INT_IRQn   (INT116_IRQn)
-#define ADC_SEQA_INT_PRIO   (DDL_IRQ_PRIO_06)
-
 /* ============ 本地状态 ============ */
 static adc_drv_inst_t *s_pstcInsts = NULL;
 static uint8_t s_u8InstNum = 0;
@@ -338,9 +322,3 @@ const struct dev_adc_ops hc32_adc_ops = {
 };
 
 /* EOF */
-
-
-
-
-
-

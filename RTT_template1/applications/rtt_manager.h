@@ -14,10 +14,12 @@
 #define DEV_REG_PRINT_EN        1   /* 设备注册 */
 #define POWER_PRINT_EN          1   /* 电源设备：过压/欠压/过流 */
 #define POLARITY_PRINT_EN       1   /* 电源极性：跳变/初始化 */
-#define LED_PRINT_EN              1   /* LED：翻转打印（1s 一次，带 us 时间戳） */
-#define MONITOR_PRINT_EN        1   /* 采样监视（1s 周期打印） */
+#define LED_PRINT_EN            0   /* LED：翻转打印（1s 一次，带 us 时间戳） */
+#define ROD_PRINT_EN             1   /* 推杆：状态/限位/霍尔故障 */
+#define MONITOR_PRINT_EN        0   /* 采样监视（1s 周期打印） */
 #define QUEUE_INIT_PRINT_EN     0   /* 队列初始化（示例，默认关闭） */
-
+#define MONITOR_SYS_PRINT_EN    1   /* 系统1s打印 */
+#define RTT_PRINTF_EN          1   /* RT-Thread rt_kprintf 重定向到 RTT（rt_hw_console_output） */
 /* ===================== 各模块打印宏封装 ===================== */
 #if SYS_STATE_PRINT_EN
 #define SYS_STATE_PRINT(fmt, ...)   MAIN_D("[SYS_STATE] " fmt, ##__VA_ARGS__)
@@ -49,10 +51,22 @@
 #define LED_PRINT(fmt, ...)         ((void)0)
 #endif
 
+#if ROD_PRINT_EN
+#define ROD_PRINT(fmt, ...)         MAIN_D("[ROD] " fmt, ##__VA_ARGS__)
+#else
+#define ROD_PRINT(fmt, ...)         ((void)0)
+#endif
+
 #if QUEUE_INIT_PRINT_EN
 #define QUEUE_INIT_PRINT(fmt, ...)  MAIN_D("[QUEUE_INIT] " fmt, ##__VA_ARGS__)
 #else
 #define QUEUE_INIT_PRINT(fmt, ...)  ((void)0)
+#endif
+
+#if RTT_PRINTF_EN
+#define RTT_PRINTF(fmt, ...)    MAIN_D("[RT_PRINTF] " fmt, ##__VA_ARGS__)
+#else
+#define RTT_PRINTF(fmt, ...)    ((void)0)
 #endif
 
 #if MONITOR_PRINT_EN
@@ -61,10 +75,18 @@
 #define MONITOR_PRINT(fmt, ...)     ((void)0)
 #endif
 
+#if MONITOR_SYS_PRINT_EN
+#define MONITOR_SYS_PRINT(fmt, ...)     MAIN_D("[SYS_MON] " fmt, ##__VA_ARGS__)
+#else
+#define MONITOR_SYS_PRINT(fmt, ...)     ((void)0)
+#endif
+
 /* 打印当前开关状态（调试用） */
 void RttManager_DumpSwitches(void);
 
 #endif /* __RTT_MANAGER_H__ */
+
+
 
 
 

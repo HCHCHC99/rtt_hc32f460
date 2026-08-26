@@ -11,8 +11,11 @@
 #include "Dev/dev_adc/dev_adc.h"
 #include <rtthread.h>
 
-#define CUR_OVER_CUR_TH_MA  (5000.0f)    /* 过流阈值 5A */
-#define CUR_OVER_WINDOW_MS  (50U)        /* 判定时间窗口 ms：10ms 均值超阈值累计 50ms 才报 */
+
+/* 阈值配置全局变量（类型/声明见 dev_cur_sensor.h；debugger 改 g_cur_cfg 实时生效） */
+volatile CurCfg_t g_cur_cfg = {
+    CUR_OVER_CUR_TH_MA_DFT, CUR_OVER_WINDOW_MS_DFT,
+};
 
 static volatile float    s_fCurrMa;      /* 1ms ISR 写，主循环/GetInfo 读 */
 static volatile uint8_t  s_u8Status;     /* 0 正常 1 过流 */
@@ -37,11 +40,11 @@ void CurrentSensor_Isr1ms(void)
     s_fCurrMa = fCurrMa;
 
     u8Prev = s_u8Status;
-    if (fCurrMa > CUR_OVER_CUR_TH_MA) {
-        if (s_u16OverMs < CUR_OVER_WINDOW_MS) {
+    if (fCurrMa > g_cur_cfg.over_th_ma) {
+        if (s_u16OverMs < g_cur_cfg.window_ms) {
             s_u16OverMs++;
         }
-        if (s_u16OverMs >= CUR_OVER_WINDOW_MS) {
+        if (s_u16OverMs >= g_cur_cfg.window_ms) {
             s_u8Status = 1U;
         }
     } else {
@@ -63,7 +66,14 @@ void CurrentSensor_GetInfo(float *pfCurr_mA, uint8_t *pu8Status)
     if (pu8Status != NULL) *pu8Status = s_u8Status;
 }
 
+uint16_t CurrentSensor_GetOverMs(void)
+{
+    return s_u16OverMs;
+}
+
 /* EOF */
+
+
 
 
 

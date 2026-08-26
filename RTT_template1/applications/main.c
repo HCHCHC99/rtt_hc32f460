@@ -26,9 +26,12 @@
 #include "Dev/dev_power/dev_cur_sensor.h"
 #include "Dev/dev_power/dev_bus_voltage.h"
 #include "Dev/dev_power/dev_power_isr.h"
+#include "Dev/dev_monitor/dev_monitor.h"
 #include "Dev/dev_power/dev_polarity.h"
 #include "Task/led_task.h"
 #include "Task/di_task.h"
+#include "Task/rod_task.h"
+#include "Dev/dev_act/dev_act.h"
 
 
 static void cmd_power(void)
@@ -70,6 +73,7 @@ static void monitor_sample_1s(void)
 
     UsTimer_UpdateTimestamp();
     Polarity_PrintPending();   /* 线程上下文：刷新未打印的极性跳变（调试） */
+    Monitor_DumpStatus();    /* 1s：系统状态机 + 过压/欠压/过流状态 */
     t_us = (uint32_t)UsTimer_GetTimestampUs();
 
     Dev_Adc_GetRaw(0, &raw_v);
@@ -101,7 +105,7 @@ int main(void)
     UsTimer_Bind(&hc_us_timer_ops);
     UsTimer_Init();
     UsTimer_Start();
-
+    rt_kprintf("aaaa");
     /* ADC 设备：绑定 HC32 底层驱动（dev_adc_ops），注册即 init（TMR0_1+AOS 已配置，未启动） */
     Dev_Adc_Bind(&hc32_adc_ops);
     Dev_RegisterAll();
@@ -110,16 +114,15 @@ int main(void)
 
     /* 表驱动状态机：对象构建（先建事件组 sys_evt，检测 ISR 发事件依赖它） */
     App_Model_Init();
+    Dev_Start();        /* registry 线程：驱动 monitor（B 模式 100ms 刷新 g_monitor） */
 
-    /* 1ms 检测心跳（TMR0_2）：电压/电流 ISR 检测 + rt_event 通知状态机 */
-    HcDrv_Timer_Start1ms(Dev_Power_Isr1ms);
-    /* 启动 500us 硬件触发采样（TMR0_1 + AOS） */
-    Dev_Adc_Start();
 
     Sys_Sm_Thread_Start();
 
     Led_Task_Start();    /* LED 闪烁任务（独立线程，1s 翻转，走 Adp GPIO） */
     Di_Task_Start();     /* DI 采集任务（10ms：电源极性扫描，事件在设备内发） */
+    Act_Arbitrator_Init();    /* 仲裁占位：方向 g_act_dir（Watch 可改） */
+    Rod_Task_Start();         /* 推杆位置/状态 10ms 更新 */
 
 
     while (1)

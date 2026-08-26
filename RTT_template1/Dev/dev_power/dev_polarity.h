@@ -9,6 +9,13 @@
 
 #include <stdint.h>
 
+/* 引脚配置（统一放头文件） */
+#define POWER_DIR_P_PIN     GET_PIN(B, 13)   /* 正极线检测 */
+#define POWER_DIR_N_PIN     GET_PIN(B, 12)   /* 负极线检测 */
+
+/* 默认配置宏（统一放头文件） */
+#define POLARITY_WIN_SIZE   (5U)             /* 双窗口各 5 点：di_task 2ms 采样 => 10ms 消抖 */
+
 /* 电源极性状态 */
 typedef enum {
     POLARITY_UNKNOWN = 0,   /* 窗口未满 / 不稳定：保持上次稳定态，不发事件 */
@@ -24,6 +31,7 @@ PolarityState_t Polarity_GetState(void); /* 查询上次稳定状态（电机控
 void Polarity_PrintPending(void);    /* 线程上下文：打印未处理的极性跳变（调试，走 POLARITY_PRINT） */
 
 #endif /* __DEV_POLARITY_H__ */
+
 
 
 

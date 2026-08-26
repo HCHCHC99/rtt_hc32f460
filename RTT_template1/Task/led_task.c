@@ -10,13 +10,7 @@
 #include "Utils/us_timer.h"   /* 翻转打印带 us 时间戳 */
 #include <rtthread.h>
 
-#define LED_PORT        (PH2_PORT)      /* GPIO_PORT_H */
-#define LED_PIN         (PH2_PIN)       /* GPIO_PIN_02 */
-#define LED_TOGGLE_MS   (1000U)         /* 翻转周期 ms */
 
-#define LED_THREAD_STACK    (1024U)
-#define LED_THREAD_PRIO     (25)        /* 低优先级，不影响电源/控制 */
-#define LED_THREAD_TICK     (10)
 
 static void led_thread_entry(void *param)
 {
