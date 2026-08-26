@@ -32,6 +32,13 @@ void Output_GPIO_Init(uint8_t u8Port, uint16_t u16Pin, en_gpio_init_state_t u8In
 
 void Input_GPIO_Init(uint8_t u8Port, uint16_t u16Pin, en_functional_state_t enablePullUp);
 
+/* 电平操作函数封装（宏 GPIO_SET/RESET/TOGGLE/READ 的等价函数，应用层优先用函数） */
+void    Hc32_Gpio_Set(uint8_t u8Port, uint16_t u16Pin);     /* 输出高电平 */
+void    Hc32_Gpio_Reset(uint8_t u8Port, uint16_t u16Pin);   /* 输出低电平 */
+void    Hc32_Gpio_Toggle(uint8_t u8Port, uint16_t u16Pin);  /* 翻转输出 */
+uint8_t Hc32_Gpio_Read(uint8_t u8Port, uint16_t u16Pin);    /* 读输入电平：0/1 */
+
 
 #endif /* __GPIO_H__ */
+
 

@@ -1,0 +1,29 @@
+/**
+ * @file    dev_polarity.h
+ * @brief   电源极性设备：GPIO 双窗口消抖 + 状态判定 + 跳变发事件（1ms ISR）
+ * @note    POWER_DIR_P=PB13 / POWER_DIR_N=PB12；各 5 点窗口（Task/di_task 2ms 采样 => 10ms 消抖）；
+ *          仅在稳定状态跳变沿发轴事件（EVT_ACT_POLARITY_FWD/REV/POWER_ABNORMAL/POWER_LOST）。
+ */
+#ifndef __DEV_POLARITY_H__
+#define __DEV_POLARITY_H__
+
+#include <stdint.h>
+
+/* 电源极性状态 */
+typedef enum {
+    POLARITY_UNKNOWN = 0,   /* 窗口未满 / 不稳定：保持上次稳定态，不发事件 */
+    POLARITY_UNPOWERED,     /* 掉电：P=0 N=0 */
+    POLARITY_FWD,           /* 正向：P=1 N=0 */
+    POLARITY_REV,           /* 反向：P=0 N=1 */
+    POLARITY_ABNORMAL,      /* 异常：P=1 N=1 */
+} PolarityState_t;
+
+void Polarity_Init(void);              /* 注册表 init：复位窗口与状态 */
+void Polarity_Scan(void);              /* 扫描（di_task 10ms 调）：读 GPIO + 推窗 + 判定 + 跳变发轴事件 */
+PolarityState_t Polarity_GetState(void); /* 查询上次稳定状态（电机控制/监控用） */
+void Polarity_PrintPending(void);    /* 线程上下文：打印未处理的极性跳变（调试，走 POLARITY_PRINT） */
+
+#endif /* __DEV_POLARITY_H__ */
+
+
+

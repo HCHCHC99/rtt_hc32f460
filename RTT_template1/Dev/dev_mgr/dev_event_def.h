@@ -24,9 +24,14 @@
 /* ===================== 轴事件组（多轴预留） ===================== */
 #define EVT_ACT_WORK_ENABLE            (1U << 0)    /* 推杆工作使能 */
 #define EVT_ACT_WORK_DISABLE           (1U << 1)    /* 推杆工作禁止 */
+#define EVT_ACT_POLARITY_FWD           (1U << 2)    /* 电源极性：正向（P=1,N=0） */
+#define EVT_ACT_POLARITY_REV           (1U << 3)    /* 电源极性：反向（P=0,N=1） */
+#define EVT_ACT_POWER_ABNORMAL         (1U << 4)    /* 电源异常（P=1,N=1） */
+#define EVT_ACT_POWER_LOST             (1U << 5)    /* 掉电（P=0,N=0） */
 #define EVT_ACT_HOLD                   (1U << 14)   /* 推杆保持/制动 */
 
 #endif /* __DEV_EVENT_DEF_H__ */
+
 
 
 

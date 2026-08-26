@@ -66,3 +66,27 @@ void Input_GPIO_Init(uint8_t u8Port, uint16_t u16Pin, en_functional_state_t enab
     GPIO_SetFunc(u8Port, u16Pin, GPIO_FUNC_0);
 }
 
+
+
+/* 电平操作函数封装（宏 GPIO_SET/RESET/TOGGLE/READ 的等价函数） */
+void Hc32_Gpio_Set(uint8_t u8Port, uint16_t u16Pin)
+{
+    GPIO_SetPins(u8Port, u16Pin);
+}
+
+void Hc32_Gpio_Reset(uint8_t u8Port, uint16_t u16Pin)
+{
+    GPIO_ResetPins(u8Port, u16Pin);
+}
+
+void Hc32_Gpio_Toggle(uint8_t u8Port, uint16_t u16Pin)
+{
+    GPIO_TogglePins(u8Port, u16Pin);
+}
+
+uint8_t Hc32_Gpio_Read(uint8_t u8Port, uint16_t u16Pin)
+{
+    return (GPIO_ReadInputPins(u8Port, u16Pin) != 0U) ? 1U : 0U;
+}
+
+/* EOF */

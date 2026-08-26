@@ -13,6 +13,7 @@
 #define VOL_UNDER_TH         (0.0f)    /* 欠压阈值 V */
 #define VOL_HYST             (2.0f)    /* 迟滞回差 V */
 #define VOL_RECOVER_DELAY_MS (3000U)   /* 恢复延时 ms（1ms 计数） */
+#define VOL_OFFSET           (1200.0f) /* 偏置电压 mV：1200mV = 1.2V（仅加在本模块，不影响 ADC 层） */
 
 static volatile float   s_fVolt;       /* 1ms ISR 写，主循环/GetInfo 读 */
 static volatile uint8_t s_u8Status;    /* 0 正常 1 欠压 2 过压 */
@@ -38,6 +39,7 @@ void BusVoltage_Isr1ms(void)
     float fVolt = 0.0f;
 
     (void)Dev_Adc_GetMean(0U, &fVolt);   /* 10ms 滑动均值，单位 V（已含 150k:10k 分压换算） */
+    fVolt += (VOL_OFFSET * 0.001f);      /* 偏置补偿：+1.2V（仅本模块，不影响 ADC 层） */
     s_fVolt = fVolt;
 
     u8PrevFault = s_u8Fault;
@@ -87,6 +89,7 @@ void BusVoltage_GetInfo(float *pfVolt_V, uint8_t *pu8Status)
 }
 
 /* EOF */
+
 
 
 

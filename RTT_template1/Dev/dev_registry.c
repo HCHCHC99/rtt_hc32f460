@@ -11,6 +11,7 @@
 #include "Dev/dev_adc/dev_adc.h"
 #include "Dev/dev_power/dev_cur_sensor.h"
 #include "Dev/dev_power/dev_bus_voltage.h"
+#include "Dev/dev_power/dev_polarity.h"
 #include <rtthread.h>
 
 #define MAX_REG_MODULES         (16U)
@@ -88,6 +89,13 @@ void Dev_RegisterAll(void)
         SYS_MODULE_REGISTER("vm", BusVoltage_Init, RT_NULL, DEV_PRIO_MID, 0);
     Dev_Registry_Add(&s_vm_module);
 #endif
+#if DEV_ENABLE_POLARITY
+    /* 执行：Task/di_task 每 10ms 调 Polarity_Scan，事件发轴事件组 */
+    static const SysModule_t s_pol_module =
+        SYS_MODULE_REGISTER("pol", Polarity_Init, RT_NULL, DEV_PRIO_MID, 0);
+    Dev_Registry_Add(&s_pol_module);
+
+#endif
 } 
 
 int Dev_Start(void)
@@ -102,6 +110,7 @@ int Dev_Start(void)
 }
 
 /* EOF */
+
 
 
 

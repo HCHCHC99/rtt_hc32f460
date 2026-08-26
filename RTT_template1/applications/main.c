@@ -26,9 +26,10 @@
 #include "Dev/dev_power/dev_cur_sensor.h"
 #include "Dev/dev_power/dev_bus_voltage.h"
 #include "Dev/dev_power/dev_power_isr.h"
+#include "Dev/dev_power/dev_polarity.h"
+#include "Task/led_task.h"
+#include "Task/di_task.h"
 
-/* defined the LED_GREEN pin: PD4 */
-#define LED_GREEN_PIN GET_PIN(H, 2)
 
 static void cmd_power(void)
 {
@@ -68,6 +69,7 @@ static void monitor_sample_1s(void)
     uint32_t t_us = 0U;
 
     UsTimer_UpdateTimestamp();
+    Polarity_PrintPending();   /* 线程上下文：刷新未打印的极性跳变（调试） */
     t_us = (uint32_t)UsTimer_GetTimestampUs();
 
     Dev_Adc_GetRaw(0, &raw_v);
@@ -83,8 +85,12 @@ static void monitor_sample_1s(void)
     c_lst_i = (uint16_t)c_lst;
     c_lst_d = (uint16_t)((c_lst - (float)c_lst_i) * 10.0f);
 
-    MONITOR_PRINT("t=%uus AD=%u/%u avg=%umV/%u.%01umA cur=%u.%01umA vol=%umV",
-                  t_us, raw_v, raw_i, v_avg_mv, c_avg_i, c_avg_d, c_lst_i, c_lst_d, v_lst_mv);
+    /* ADC 层：原始 AD + 最近一次换算（无均值、无偏置） */
+    MONITOR_PRINT("adc: t=%uus AD=%u/%u cur=%u.%01umA vol=%umV",
+                  t_us, raw_v, raw_i, c_lst_i, c_lst_d, v_lst_mv);
+    /* 设备层：电流传感器均值 + 母线电压均值（电压已含 VOL_OFFSET 偏置） */
+    MONITOR_PRINT("dev: t=%uus cur=%u.%01umA vol=%umV",
+                  t_us, c_avg_i, c_avg_d, v_avg_mv);
 }
 volatile int test = 0;
 int main(void)
@@ -107,28 +113,24 @@ int main(void)
 
     /* 1ms 检测心跳（TMR0_2）：电压/电流 ISR 检测 + rt_event 通知状态机 */
     HcDrv_Timer_Start1ms(Dev_Power_Isr1ms);
-    /* 启动 200us 硬件触发采样（TMR0_1 + AOS） */
+    /* 启动 500us 硬件触发采样（TMR0_1 + AOS） */
     Dev_Adc_Start();
 
     Sys_Sm_Thread_Start();
 
-    /* set LED_GREEN_PIN pin mode to output */
-    rt_pin_mode(LED_GREEN_PIN, PIN_MODE_OUTPUT);
+    Led_Task_Start();    /* LED 闪烁任务（独立线程，1s 翻转，走 Adp GPIO） */
+    Di_Task_Start();     /* DI 采集任务（10ms：电源极性扫描，事件在设备内发） */
 
-    Output_GPIO_Init(GPIO_PORT_H, GPIO_PIN_02, GPIO_INIT_LOW);
 
     while (1)
     {
         test++;
 
-        rt_thread_mdelay(500);
-        rt_pin_write(LED_GREEN_PIN, PIN_LOW);
-        rt_thread_mdelay(500);
-        rt_pin_write(LED_GREEN_PIN, PIN_HIGH);
-//        GPIO_TogglePins(GPIO_PORT_H, GPIO_PIN_02);
-				monitor_sample_1s();
+        rt_thread_mdelay(1000);
+        monitor_sample_1s();
     }
 }
+
 
 
 

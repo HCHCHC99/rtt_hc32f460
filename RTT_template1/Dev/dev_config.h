@@ -10,6 +10,7 @@
 #define DEV_ENABLE_ADC              1   /* ADC 设备（经 dev_adc_ops 访问底层驱动） */
 #define DEV_ENABLE_CUR_SENSOR       1   /* 电流传感器设备 */
 #define DEV_ENABLE_BUS_VOLTAGE      1   /* 母线电压设备 */
+#define DEV_ENABLE_POLARITY         1   /* 电源极性设备（GPIO 双窗口，1ms ISR） */
 
 /* ============ 设备优先级常量（数字越小优先级越高，与 dev_registry 语义一致） ============ */
 #define DEV_PRIO_HIGH               2
@@ -17,3 +18,4 @@
 #define DEV_PRIO_LOW                4
 
 #endif /* __DEV_CONFIG_H__ */
+

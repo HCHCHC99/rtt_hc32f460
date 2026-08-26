@@ -45,7 +45,11 @@ void App_Model_Init(void);
 /* 启动系统状态机线程（rt_event_recv 阻塞 -> StateMachine_SendEvent） */
 void Sys_Sm_Thread_Start(void);
 
+/* 向所有轴事件组广播事件（ISR 安全；电机控制/电源极性等用） */
+void Act_Event_Send(rt_uint32_t bits);
+
 #endif /* __DEV_MODEL_H__ */
+
 
 
 

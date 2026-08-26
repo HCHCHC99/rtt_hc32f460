@@ -40,5 +40,16 @@ void App_Model_Init(void)
     Sys_Event_Send(EVT_SYS_INIT_DONE | EVT_SYS_CMD_WORK_ENABLE);
 }
 
+void Act_Event_Send(rt_uint32_t bits)
+{
+    int i;
+    for (i = 0; i < MAX_AXIS_NUM; i++) {
+        if (mySystem.axis[i].evt_act != RT_NULL) {
+            (void)rt_event_send(mySystem.axis[i].evt_act, bits);
+        }
+    }
+}
+
 /* EOF */
+
 
