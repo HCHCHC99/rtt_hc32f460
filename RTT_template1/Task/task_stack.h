@@ -19,11 +19,14 @@
 #define TASK_STACK_FINSH    (4096U)   /* finsh MSH shell */
 #define TASK_STACK_IDLE     (256U)    /* idle 空闲线程 */
 #define TASK_STACK_WORKQ    (2048U)   /* workq 系统工作队列 */
+#define TASK_STACK_TIMER    (512U)    /* timer 软定时器线程（RT-Thread 默认 512B） */
 
 /* 任务栈登记项 */
 typedef struct {
     const char *name;      /* 线程名（与 rt_thread_create 的 name 一致） */
     uint32_t    stack;     /* 栈大小（字节） */
+    uint32_t    min_free;  /* 运行期哨兵扫描到的最低剩余字节 */
+    uint8_t     tracked;   /* 是否已在运行线程列表中匹配到该线程 */
 } TaskStackItem_t;
 
 /* 打印所有任务栈大小 + 总栈 + 堆余量（MAIN_D，英文整型） */

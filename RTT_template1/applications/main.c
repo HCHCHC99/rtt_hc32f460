@@ -122,8 +122,8 @@ int main(void)
 
     Sys_Sm_Thread_Start();
 
-    Led_Task_Start();    /* LED 闪烁任务（独立线程，1s 翻转，走 Adp GPIO） */
     Di_Task_Start();     /* DI 采集任务（10ms：电源极性扫描，事件在设备内发） */
+    Led_Task_Start();    /* LED 闪烁任务（独立线程，1s 翻转，走 Adp GPIO） */
     Act_Arbitrator_Init();    /* 仲裁占位：方向 g_act_dir（Watch 可改） */
     Rod_Task_Start();         /* 推杆位置/状态 10ms 更新 */
 
