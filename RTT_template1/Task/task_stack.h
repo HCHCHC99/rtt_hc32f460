@@ -11,14 +11,14 @@
 
 /* ===================== 线程栈大小统一管理（唯一权威来源） ===================== */
 #define TASK_STACK_MAIN     (4096U)   /* main 主线程：初始化 + 1s 采样打印 + MSH */
-#define TASK_STACK_SYS_SM   (2048U)   /* sys_sm 系统状态机事件线程 */
-#define TASK_STACK_DEV      (2048U)   /* dev 设备管理线程 */
-#define TASK_STACK_ROD      (2048U)   /* rod 推杆位置/状态（含 float+RTT 打印+中断嵌套；1024 曾溢出） */
-#define TASK_STACK_DI       (1024U)   /* di DI 采集（2ms 极性扫描） */
-#define TASK_STACK_LED      (2048U)   /* led LED 1s 翻转 */
-#define TASK_STACK_FINSH    (4096U)   /* finsh MSH shell */
+#define TASK_STACK_SYS_SM   (256U)   /* sys_sm 系统状态机事件线程 */
+#define TASK_STACK_DEV      (512U)   /* dev 设备管理线程 */
+#define TASK_STACK_ROD      (256U)   /* rod 推杆位置/状态（含 float+RTT 打印+中断嵌套；1024 曾溢出） */
+#define TASK_STACK_DI       (256U)   /* di DI 采集（2ms 极性扫描） */
+#define TASK_STACK_LED      (256U)   /* led LED 1s 翻转 */
+#define TASK_STACK_FINSH    (1024U)   /* finsh MSH shell */
 #define TASK_STACK_IDLE     (256U)    /* idle 空闲线程 */
-#define TASK_STACK_WORKQ    (2048U)   /* workq 系统工作队列 */
+#define TASK_STACK_WORKQ    (256U)   /* workq 系统工作队列 */
 #define TASK_STACK_TIMER    (512U)    /* timer 软定时器线程（RT-Thread 默认 512B） */
 
 /* 任务栈登记项 */
@@ -33,7 +33,7 @@ typedef struct {
 void Task_Stack_Dump(void);
 
 /* 哨兵水位告警阈值：线程栈已用 >= 该百分比时打印（%），0=关闭 */
-#define TASK_STACK_WARN_PCT   (75U)
+#define TASK_STACK_WARN_PCT   (90U)
 
 /*
  * 周期监控所有线程栈：扫描 '#' 哨兵水位，超过 TASK_STACK_WARN_PCT 才打印

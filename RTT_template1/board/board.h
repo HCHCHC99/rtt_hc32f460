@@ -30,8 +30,9 @@ extern int Image$$RW_IRAM1$$ZI$$Limit;
 #pragma section="HEAP"
 #define HEAP_BEGIN                      (__segment_end("HEAP"))
 #else
-extern int __bss_end;
-#define HEAP_BEGIN                      (&__bss_end)
+/* Skip the startup-owned newlib heap and MSP stack reserved by link.ld. */
+extern int __StackTop;
+#define HEAP_BEGIN                      (&__StackTop)
 #endif
 
 #define HEAP_END                        HC32_SRAM_END

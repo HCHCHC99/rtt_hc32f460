@@ -12,7 +12,7 @@
 #define LED_PORT        (PH2_PORT)      /* GPIO_PORT_H */
 #define LED_PIN         (PH2_PIN)       /* GPIO_PIN_02 */
 #define LED_THREAD_STACK    TASK_STACK_LED   /* 引用 task_stack.h 唯一来源 */
-#define LED_THREAD_PRIO     (25)        /* 低优先级，不影响电源/控制 */
+#define LED_THREAD_PRIO     (18)        /* 低优先级，不影响电源/控制 */
 #define LED_THREAD_TICK     (10)
 
 /* 初始化 LED GPIO 并启动闪烁线程 */
