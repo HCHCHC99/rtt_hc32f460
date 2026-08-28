@@ -148,6 +148,11 @@ void Task_Stack_Monitor(void)
         (void)Task_Stack_UpdateWatermark(t, free_bytes);
         used = Task_Stack_Used(size, free_bytes);
         pct = used * 100U / size;
+        TASK_STACK_PRINT("/////// %s sp=0x%08x base=0x%08x size=%u used=%u(%u%%)",
+                t->name,
+                (unsigned)(rt_ubase_t)t->sp,
+                (unsigned)(rt_ubase_t)t->stack_addr,
+                (unsigned)size, (unsigned)used, (unsigned)pct);
         if (pct >= (uint32_t)TASK_STACK_WARN_PCT) {
             TASK_STACK_PRINT("WARN %s sp=0x%08x base=0x%08x size=%u used=%u(%u%%)",
                              t->name,
