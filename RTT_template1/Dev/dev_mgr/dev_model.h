@@ -14,7 +14,7 @@
 
 /* 系统状态机线程配置（统一放头文件） */
 #define SYS_SM_THREAD_STACK   TASK_STACK_SYS_SM
-#define SYS_SM_THREAD_PRIO    22
+#define SYS_SM_THREAD_PRIO    19
 #define SYS_SM_THREAD_TICK    10
 #include <rtthread.h>
 

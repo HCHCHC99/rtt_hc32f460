@@ -15,7 +15,11 @@
 #include "Adp/hc_drv_timer.h"
 #include "Dev/dev_adc/dev_adc.h"
 #include "Dev/dev_power/dev_power_isr.h"
+#include "Dev/dev_act/dev_act.h"
+#include "Dev/dev_power/dev_polarity.h"
 #include <rtthread.h>
+
+static volatile uint32_t s_arb_cmd_send_fail_count = 0U;
 
 /* 状态入口函数声明 */
 static void sys_enter_init(void);
@@ -24,6 +28,14 @@ static void sys_enter_run(void);
 static void sys_enter_stop(void);
 static void sys_enter_fault(void);
 static void sys_enter_emergency(void);
+static void Sys_State_ArbSendCommand(uint8_t axis_id,
+                                     uint8_t device_id,
+                                     uint8_t priority,
+                                     uint8_t cmd_type,
+                                     uint8_t duty_pct,
+                                     rt_bool_t urgent);
+static void Sys_State_SetArbEnable(uint8_t axis_id, rt_bool_t enable);
+static void Sys_State_ResyncActFromFault(void);
 static const StateJumpTable_t sys_jump[] = {
     {SYS_STATE_INIT,        EVT_SYS_INIT_DONE,             SYS_STATE_IDLE},
 
@@ -84,12 +96,12 @@ void Sys_State_Dispatch(rt_uint32_t bits)
         mySystem.fault_bits |= (1U << 0);   /* 过流故障置位 */
         POWER_PRINT("over curr");
         StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_OVER_CURRENT);
+    }
     if (bits & EVT_SYS_ROD_LIMIT_FAULT) {
         mySystem.error_code = SYS_ERR_ROD_LIMIT;
         mySystem.fault_bits |= (1U << 3);   /* 推杆上下霍尔故障置位 */
         ROD_PRINT("rod limit fault");
         StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_ROD_LIMIT_FAULT);
-    }
     }
     if (bits & EVT_SYS_VOLT_OVER) {
         mySystem.error_code = SYS_ERR_VOLT_OVER;
@@ -151,7 +163,77 @@ void Sys_State_Recover(void)
 static void sys_state_log_enter(const char *name)
 {
     UsTimer_UpdateTimestamp();
-    SYS_STATE_PRINT("enter %s t=%uus", name, (unsigned)UsTimer_GetTimestampUs());
+    MAIN_D_SYNC("[SYS_STATE] enter %s t=%uus", name, (unsigned)UsTimer_GetTimestampUs());
+}
+
+static void Sys_State_ArbSendCommand(uint8_t axis_id,
+                                     uint8_t device_id,
+                                     uint8_t priority,
+                                     uint8_t cmd_type,
+                                     uint8_t duty_pct,
+                                     rt_bool_t urgent)
+{
+    rt_err_t ret = Arb_SendCommand(axis_id, device_id, priority,
+                                   cmd_type, duty_pct, urgent);
+    if (ret != RT_EOK) {
+        s_arb_cmd_send_fail_count++;
+        ARB_PRINT("send fail axis=%u dev=%u cmd=%u err=%d count=%u",
+                  (unsigned)axis_id, (unsigned)device_id,
+                  (unsigned)cmd_type, (int)ret,
+                  (unsigned)s_arb_cmd_send_fail_count);
+    }
+}
+
+static void Sys_State_SetArbEnable(uint8_t axis_id, rt_bool_t enable)
+{
+    rt_err_t ret = Arb_SetEnable(axis_id, enable);
+    if (ret != RT_EOK) {
+        ARB_PRINT("enable fail axis=%u enable=%u err=%d",
+                  (unsigned)axis_id, (unsigned)(enable != RT_FALSE), (int)ret);
+    }
+}
+
+/* FAULT->RUN skips IDLE/InitAll, so arbitration must be re-enabled explicitly. */
+static void Sys_State_ResyncActFromFault(void)
+{
+    int i;
+    PolarityState_t polarity = Polarity_GetState();
+
+    SYS_STATE_PRINT("act resync from fault");
+    for (i = 0; i < MAX_AXIS_NUM; i++) {
+        Sys_State_SetArbEnable((uint8_t)i, RT_TRUE);
+    }
+
+    if (polarity == POLARITY_FWD) {
+        Sys_State_ArbSendCommand(POLARITY_ARB_AXIS_ID,
+                                 (uint8_t)DEV_ID_POWER_POS,
+                                 (uint8_t)PRIO_POWER,
+                                 (uint8_t)CMD_TYPE_RUN_FWD,
+                                 POLARITY_ARB_RUN_DUTY_PCT,
+                                 RT_FALSE);
+    }
+    else if (polarity == POLARITY_REV) {
+        Sys_State_ArbSendCommand(POLARITY_ARB_AXIS_ID,
+                                 (uint8_t)DEV_ID_POWER_NEG,
+                                 (uint8_t)PRIO_POWER,
+                                 (uint8_t)CMD_TYPE_RUN_REV,
+                                 POLARITY_ARB_RUN_DUTY_PCT,
+                                 RT_FALSE);
+    }
+    else {
+        Sys_State_ArbSendCommand(POLARITY_ARB_AXIS_ID,
+                                 (uint8_t)DEV_ID_POWER_POS,
+                                 (uint8_t)PRIO_POWER,
+                                 (uint8_t)CMD_TYPE_CLEAR_ALLOW_FWD,
+                                 0U,
+                                 RT_FALSE);
+        Sys_State_ArbSendCommand(POLARITY_ARB_AXIS_ID,
+                                 (uint8_t)DEV_ID_POWER_POS,
+                                 (uint8_t)PRIO_POWER,
+                                 (uint8_t)CMD_TYPE_CLEAR_ALLOW_REV,
+                                 0U,
+                                 RT_FALSE);
+    }
 }
 
 /* ---- 状态入口函数 ---- */
@@ -178,6 +260,11 @@ static void sys_enter_run(void)
 {
     int i;
     sys_state_log_enter("RUN");
+
+    if (mySystem.sys_sm.previous_state == (State_t)SYS_STATE_FAULT) {
+        Sys_State_ResyncActFromFault();
+    }
+
     /* 多轴预留：仅使能已配置(ACT_DIR_NONE != dir)的轴 */
     for (i = 0; i < MAX_AXIS_NUM; i++) {
         if (ACT_DIR_NONE != mySystem.axis[i].dir) {
@@ -196,9 +283,21 @@ static void sys_enter_stop(void)
 }
 static void sys_enter_fault(void)
 {
+    int i;
+
     /* 故障码为整型，可直接打印 */
     UsTimer_UpdateTimestamp();
     SYS_STATE_PRINT("enter FAULT code=%u t=%uus", (unsigned)mySystem.error_code, (unsigned)UsTimer_GetTimestampUs());
+    for (i = 0; i < MAX_AXIS_NUM; i++) {
+        Sys_State_SetArbEnable((uint8_t)i, RT_FALSE);
+        /* 直入 FAULT（不经 EMERGENCY）时也必须停硬件输出：清允许并触发决策 */
+        Sys_State_ArbSendCommand((uint8_t)i,
+                                 (uint8_t)DEV_ID_EMERGENCY,
+                                 (uint8_t)PRIO_EMERGENCY,
+                                 (uint8_t)CMD_TYPE_EMERGENCY_STOP,
+                                 0U,
+                                 RT_TRUE);
+    }
 }
 static void sys_enter_emergency(void)
 {
@@ -208,6 +307,12 @@ static void sys_enter_emergency(void)
     /* 急停动作：全轴制动（多轴预留） */
     for (i = 0; i < MAX_AXIS_NUM; i++) {
         (void)rt_event_send(mySystem.axis[i].evt_act, EVT_ACT_HOLD);
+        Sys_State_ArbSendCommand((uint8_t)i,
+                                 (uint8_t)DEV_ID_EMERGENCY,
+                                 (uint8_t)PRIO_EMERGENCY,
+                                 (uint8_t)CMD_TYPE_EMERGENCY_STOP,
+                                 0U,
+                                 RT_TRUE);
     }
     /* 急停后跳入 FAULT（稳定故障态） */
     StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_FAULT);

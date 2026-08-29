@@ -16,6 +16,8 @@ static TaskStackItem_t s_task_stack[] = {
     { "dev",      (uint32_t)TASK_STACK_DEV,   UINT32_MAX, 0U },
     { "rod",      (uint32_t)TASK_STACK_ROD,   UINT32_MAX, 0U },
     { "di",       (uint32_t)TASK_STACK_DI,    UINT32_MAX, 0U },
+    { "act",      (uint32_t)TASK_STACK_ARB,   UINT32_MAX, 0U },
+    { "arbtst",   (uint32_t)TASK_STACK_ARB_SELFTEST, UINT32_MAX, 0U },
     { "led",      (uint32_t)TASK_STACK_LED,   UINT32_MAX, 0U },
     { "tshell",   (uint32_t)TASK_STACK_FINSH, UINT32_MAX, 0U },
     { "tidle0",   (uint32_t)TASK_STACK_IDLE,  UINT32_MAX, 0U },
@@ -148,7 +150,7 @@ void Task_Stack_Monitor(void)
         (void)Task_Stack_UpdateWatermark(t, free_bytes);
         used = Task_Stack_Used(size, free_bytes);
         pct = used * 100U / size;
-        TASK_STACK_PRINT("/////// %s sp=0x%08x base=0x%08x size=%u used=%u(%u%%)",
+        TASK_STACK_PRINT("===== AAAA  %s sp=0x%08x base=0x%08x size=%u used=%u(%u%%)  =====",
                 t->name,
                 (unsigned)(rt_ubase_t)t->sp,
                 (unsigned)(rt_ubase_t)t->stack_addr,

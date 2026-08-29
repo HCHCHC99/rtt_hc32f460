@@ -11,17 +11,27 @@
 
 /* 线程等待的系统事件位（与 sys_jump 表使用的事件一致） */
 
+/* INIT 卡死诊断计数：main.c 每秒随 [SM_DIAG] 打印（打印可能被 RTT 丢，变量不会） */
+volatile uint32_t g_sm_diag_entered = 0U;
+volatile uint32_t g_sm_diag_recv_ok = 0U;
 
 static void sys_sm_thread_entry(void *param)
 {
     rt_uint32_t e;
 
     (void)param;
+    g_sm_diag_entered = 1U;
+    MAIN_D_SYNC("[SYS_STATE] sm thread entry");
     while (1) {
         if (rt_event_recv(mySystem.sys_evt, SYS_SM_WAIT_EVENTS,
                           RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR,
                           RT_WAITING_FOREVER, &e) == RT_EOK) {
+            g_sm_diag_recv_ok++;
+            MAIN_D_SYNC("[SYS_STATE] sm dispatch evt=0x%08x", (unsigned)e);
             Sys_State_Dispatch(e);
+        }
+        else {
+            SYS_STATE_PRINT("sm recv err");
         }
     }
 }
@@ -35,7 +45,9 @@ void Sys_Sm_Thread_Start(void)
                                       SYS_SM_THREAD_PRIO,
                                       SYS_SM_THREAD_TICK);
     if (th != RT_NULL) {
-        rt_thread_startup(th);
+        rt_err_t ret = rt_thread_startup(th);
+        MAIN_D_SYNC("[SYS_STATE] sm thread started prio=%d ret=%d",
+                    (int)SYS_SM_THREAD_PRIO, (int)ret);
     } else {
         SYS_STATE_PRINT("thread create failed");
     }

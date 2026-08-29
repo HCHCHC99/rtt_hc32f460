@@ -6,6 +6,7 @@
  *          消费方为电机控制（轴仲裁）模块。
  */
 #include "dev_polarity.h"
+#include "Dev/dev_act/dev_act.h"
 #include "Dev/dev_mgr/dev_model.h"
 #include "Dev/dev_mgr/dev_event_def.h"
 #include "drv_gpio.h"          /* GET_PIN / GPIO_PORT_B */
@@ -29,6 +30,7 @@ static PolarityWin_t s_pWin;
 static PolarityWin_t s_nWin;
 static uint8_t s_bInit = 0U;
 static volatile uint8_t s_u8PendingState = 0U;  /* 待打印的跳变状态（ISR 置位，线程清） */
+static volatile uint32_t s_arb_send_fail_count = 0U;
 
 /* ============ 窗口操作 ============ */
 static uint8_t Polarity_WinFull(const PolarityWin_t *w)
@@ -53,6 +55,27 @@ static uint8_t Polarity_WinAllZero(const PolarityWin_t *w)
 static uint8_t Polarity_WinAllOne(const PolarityWin_t *w)
 {
     return (Polarity_WinFull(w) && (w->win == (uint16_t)((1U << POLARITY_WIN_SIZE) - 1U)));
+}
+
+/* 极性命令是带数据通道；队列满只告警计数，不阻塞扫描线程 */
+static void Polarity_SendArb(uint8_t device_id, uint8_t cmd_type, uint8_t duty_pct)
+{
+    rt_err_t ret = Arb_SendCommand(POLARITY_ARB_AXIS_ID,
+                                   device_id,
+                                   (uint8_t)PRIO_POWER,
+                                   cmd_type,
+                                   duty_pct,
+                                   RT_FALSE);
+
+    if (ret != RT_EOK) {
+        s_arb_send_fail_count++;
+        ARB_PRINT("send fail axis=%u dev=%u cmd=%u err=%d count=%u",
+                  (unsigned)POLARITY_ARB_AXIS_ID,
+                  (unsigned)device_id,
+                  (unsigned)cmd_type,
+                  (int)ret,
+                  (unsigned)s_arb_send_fail_count);
+    }
 }
 
 /* 稳定判定：窗口未满或任一窗口不稳定 -> UNKNOWN（保持上次稳定态） */
@@ -104,10 +127,28 @@ void Polarity_Scan(void)
         s_state = st;
         s_u8PendingState = (uint8_t)st;   /* 由线程上下文 Polarity_PrintPending 打印 */
         switch (st) {
-        case POLARITY_UNPOWERED: Act_Event_Send(EVT_ACT_POWER_LOST);     break;
-        case POLARITY_FWD:       Act_Event_Send(EVT_ACT_POLARITY_FWD);   break;
-        case POLARITY_REV:       Act_Event_Send(EVT_ACT_POLARITY_REV);   break;
-        case POLARITY_ABNORMAL:  Act_Event_Send(EVT_ACT_POWER_ABNORMAL); break;
+        case POLARITY_UNPOWERED:
+            Act_Event_Send(EVT_ACT_POWER_LOST);
+            Polarity_SendArb((uint8_t)DEV_ID_POWER_POS, (uint8_t)CMD_TYPE_CLEAR_ALLOW_FWD, 0U);
+            Polarity_SendArb((uint8_t)DEV_ID_POWER_POS, (uint8_t)CMD_TYPE_CLEAR_ALLOW_REV, 0U);
+            break;
+        case POLARITY_FWD:
+            Act_Event_Send(EVT_ACT_POLARITY_FWD);
+            Polarity_SendArb((uint8_t)DEV_ID_POWER_POS,
+                             (uint8_t)CMD_TYPE_RUN_FWD,
+                             POLARITY_ARB_RUN_DUTY_PCT);
+            break;
+        case POLARITY_REV:
+            Act_Event_Send(EVT_ACT_POLARITY_REV);
+            Polarity_SendArb((uint8_t)DEV_ID_POWER_NEG,
+                             (uint8_t)CMD_TYPE_RUN_REV,
+                             POLARITY_ARB_RUN_DUTY_PCT);
+            break;
+        case POLARITY_ABNORMAL:
+            Act_Event_Send(EVT_ACT_POWER_ABNORMAL);
+            Polarity_SendArb((uint8_t)DEV_ID_POWER_POS, (uint8_t)CMD_TYPE_CLEAR_ALLOW_FWD, 0U);
+            Polarity_SendArb((uint8_t)DEV_ID_POWER_POS, (uint8_t)CMD_TYPE_CLEAR_ALLOW_REV, 0U);
+            break;
         default: break;
         }
     }

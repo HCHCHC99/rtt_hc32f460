@@ -338,6 +338,10 @@ static void finsh_wait_auth(void)
                 ch = (int)finsh_getchar();
                 if (ch < 0)
                 {
+                    /* console device missing: finsh_getchar returns EOF immediately.
+                       Busy-looping here would starve ALL lower-priority threads
+                       (sys_sm/di_task at prio 22 never scheduled). Yield instead. */
+                    rt_thread_mdelay(10);
                     continue;
                 }
 
@@ -800,4 +804,3 @@ int finsh_system_init(void)
 INIT_APP_EXPORT(finsh_system_init);
 
 #endif /* RT_USING_FINSH */
-

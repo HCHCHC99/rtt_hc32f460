@@ -7,6 +7,7 @@
 #include "dev_model.h"
 #include "dev_state.h"
 #include "dev_event_def.h"
+#include "rtt_manager.h"
 #include <rtthread.h>
 
 /* 全局系统对象 */
@@ -45,6 +46,7 @@ void App_Model_Init(void)
 
     /* 4. 上电自动启动（对应原 State_Init 末尾的 EventGroup_Send） */
     Sys_Event_Send(EVT_SYS_INIT_DONE | EVT_SYS_CMD_WORK_ENABLE);
+    MAIN_D_SYNC("[SYS_STATE] INIT_DONE|WORK_ENABLE sent");
 }
 
 void Act_Event_Send(rt_uint32_t bits)

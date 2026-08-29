@@ -13,15 +13,25 @@
 typedef struct {
     const char *name;
     void (*init)(void);
+
+    /* B mode: cooperative periodic task driven by Dev_Registry_UpdateAll. */
     void (*task)(void);
-    uint8_t     prio;        /* 数字越小优先级越高 */
     uint16_t    period_ms;
+
+    /* C mode: registry creates and starts one thread for this entry. */
+    void    (*thread_entry)(void *param);
+    uint16_t thread_stack;   /* stack size in bytes */
+
+    uint8_t  prio;           /* lower value means higher priority */
     uint32_t    last_tick;
     uint8_t     enabled;
 } SysModule_t;
 
 #define SYS_MODULE_REGISTER(_name, _init, _task, _prio, _period) \
-    { #_name, _init, _task, _prio, _period, 0, 1 }
+    { #_name, _init, _task, _period, RT_NULL, 0, _prio, 0, 1 }
+
+#define SYS_MODULE_REGISTER_THREAD(_name, _init, _thread, _prio, _stack) \
+    { #_name, _init, RT_NULL, 0, _thread, _stack, _prio, 0, 1 }
 
 int  Dev_Registry_Add(const SysModule_t *module);
 void Dev_RegisterAll(void);   /* 集中注册：adc / cur / vm */

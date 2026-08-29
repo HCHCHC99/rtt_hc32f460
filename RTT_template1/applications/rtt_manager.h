@@ -14,13 +14,14 @@
 #define DEV_REG_PRINT_EN        1   /* 设备注册 */
 #define POWER_PRINT_EN          1   /* 电源设备：过压/欠压/过流 */
 #define POLARITY_PRINT_EN       1   /* 电源极性：跳变/初始化 */
+#define ARB_PRINT_EN            1   /* 电机仲裁：决策/队列/复位 */
 #define LED_PRINT_EN            0   /* LED：翻转打印（1s 一次，带 us 时间戳） */
-#define ROD_PRINT_EN             1   /* 推杆：状态/限位/霍尔故障 */
-#define MONITOR_PRINT_EN        0   /* 采样监视（1s 周期打印） */
+#define ROD_PRINT_EN            1   /* 推杆：状态/限位/霍尔故障 */
+#define MONITOR_PRINT_EN        1   /* 采样监视（1s 周期打印） */
 #define QUEUE_INIT_PRINT_EN     0   /* 队列初始化（示例，默认关闭） */
 #define MONITOR_SYS_PRINT_EN    1   /* 系统1s打印 */
-#define RTT_PRINTF_EN          1   /* RT-Thread rt_kprintf 重定向到 RTT（rt_hw_console_output） */
-#define TASK_STACK_PRINT_EN     1   /* 任务栈统一管理：各线程栈大小/总栈/堆余量 */
+#define RTT_PRINTF_EN           1   /* RT-Thread rt_kprintf 重定向到 RTT（rt_hw_console_output） */
+#define TASK_STACK_PRINT_EN     0   /* 任务栈统一管理：各线程栈大小/总栈/堆余量 */
 /* ===================== 各模块打印宏封装 ===================== */
 #if SYS_STATE_PRINT_EN
 #define SYS_STATE_PRINT(fmt, ...)   MAIN_D("[SYS_STATE] " fmt, ##__VA_ARGS__)
@@ -44,6 +45,12 @@
 #define POLARITY_PRINT(fmt, ...)    MAIN_D("[POLARITY] " fmt, ##__VA_ARGS__)
 #else
 #define POLARITY_PRINT(fmt, ...)    ((void)0)
+#endif
+
+#if ARB_PRINT_EN
+#define ARB_PRINT(fmt, ...)         MAIN_D("[ARB] " fmt, ##__VA_ARGS__)
+#else
+#define ARB_PRINT(fmt, ...)         ((void)0)
 #endif
 
 #if LED_PRINT_EN

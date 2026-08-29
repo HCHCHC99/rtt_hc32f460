@@ -16,6 +16,10 @@
 /* 默认配置宏（统一放头文件） */
 #define POLARITY_WIN_SIZE   (5U)             /* 双窗口各 5 点：di_task 2ms 采样 => 10ms 消抖 */
 
+/* 仲裁命令映射（当前唯一实体电机轴；axis 1 预留） */
+#define POLARITY_ARB_AXIS_ID        (0U)
+#define POLARITY_ARB_RUN_DUTY_PCT   (85U)   /* 后续按电机负载和温升调整 */
+
 /* 电源极性状态 */
 typedef enum {
     POLARITY_UNKNOWN = 0,   /* 窗口未满 / 不稳定：保持上次稳定态，不发事件 */

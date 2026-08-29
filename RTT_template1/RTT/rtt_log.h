@@ -2,6 +2,10 @@
 #define __RTT_LOG_CHANNEL_H
 
 #include "SEGGER_RTT.h"
+#include <rtthread.h>
+
+/* RT-Thread 秒级以下忙等（board.c SysTick 实现）；rtthread.h 未声明，此处补充 */
+extern void rt_hw_us_delay(rt_uint32_t us);
 
 //====================================================================
 // 1. 日志等级定义
@@ -48,6 +52,10 @@ typedef enum {
 
 // ---------------------- 通道 0：主程序 MAIN ----------------------
 #define MAIN_D(fmt, ...)  LOG_CH(LOG_CH_MAIN, LOG_LEVEL_DEBUG, COLOR_CYAN,   "MAIN", fmt, ##__VA_ARGS__)
+/* 关键启动打印：写后短暂忙等，给 J-Link 排空 RTT 环形缓冲的时间；
+   不停顿时缓冲满会整条丢弃（NO_BLOCK_SKIP）。仅用于启动/低频关键路径，勿用于高频循环 */
+#define MAIN_D_SYNC(fmt, ...) \
+    do { MAIN_D(fmt, ##__VA_ARGS__); rt_hw_us_delay(200U); } while (0)
 #define MAIN_I(fmt, ...)  LOG_CH(LOG_CH_MAIN, LOG_LEVEL_INFO,  COLOR_GREEN, "MAIN", fmt, ##__VA_ARGS__)
 #define MAIN_W(fmt, ...)  LOG_CH(LOG_CH_MAIN, LOG_LEVEL_WARN,  COLOR_YELLOW,"MAIN", fmt, ##__VA_ARGS__)
 #define MAIN_E(fmt, ...)  LOG_CH(LOG_CH_MAIN, LOG_LEVEL_ERROR, COLOR_RED,   "MAIN", fmt, ##__VA_ARGS__)

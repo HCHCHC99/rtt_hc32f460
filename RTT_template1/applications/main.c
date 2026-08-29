@@ -33,6 +33,11 @@
 #include "Task/rod_task.h"
 #include "Task/task_stack.h"
 #include "Dev/dev_act/dev_act.h"
+#include "Dev/dev_config.h"
+
+/* dev_sm_thread.c 的 INIT 诊断计数 */
+extern volatile uint32_t g_sm_diag_entered;
+extern volatile uint32_t g_sm_diag_recv_ok;
 
 
 static void cmd_power(void)
@@ -75,6 +80,24 @@ static void monitor_sample_1s(void)
     UsTimer_UpdateTimestamp();
     Polarity_PrintPending();   /* 线程上下文：刷新未打印的极性跳变（调试） */
     Monitor_DumpStatus();    /* 1s：系统状态机 + 过压/欠压/过流状态 */
+    /* INIT 卡死诊断：状态 / 事件组未消费位 / sys_sm 线程是否存在，三样一屏定位 */
+    MAIN_D("[SM_DIAG] cur=%d evt_flag=0x%08x sys_sm=%s entered=%u recv=%u",
+           (int)mySystem.sys_sm.cur_state,
+           (unsigned)(mySystem.sys_evt ? mySystem.sys_evt->set : 0U),
+           rt_thread_find((char *)"sys_sm") ? "yes" : "no",
+           (unsigned)g_sm_diag_entered, (unsigned)g_sm_diag_recv_ok);
+    /* 线程调度真相：全线程调度状态 + 优先级（谁没启动/谁在空转一目了然）
+       stat 含义: 0=INIT 1=SUSPEND 2=READY 3=RUNNING 4=CLOSE */
+    {
+        struct rt_object_information *info = rt_object_get_information(RT_Object_Class_Thread);
+        rt_list_t *node;
+        for (node = info->object_list.next; node != &(info->object_list); node = node->next)
+        {
+            rt_thread_t t = (rt_thread_t)rt_list_entry(node, struct rt_object, list);
+            MAIN_D("[TH_DIAG] %-8s stat=%d prio=%d",
+                   t->name, (int)(t->stat & RT_THREAD_STAT_MASK), (int)t->current_priority);
+        }
+    }
     t_us = (uint32_t)UsTimer_GetTimestampUs();
 
     Dev_Adc_GetRaw(0, &raw_v);
@@ -100,8 +123,95 @@ static void monitor_sample_1s(void)
     Task_Stack_Monitor();      /* 1s：栈哨兵水位监控，超 75% 才打印 */
 }
 volatile int test = 0;
+
+#if DEV_ENABLE_ARB_SELFTEST
+/* ============ 仲裁台架自测（无串口注入命令用；量产把 DEV_ENABLE_ARB_SELFTEST 置 0） ============ */
+#define ARB_SELFTEST_AXIS_ID        0U
+#define ARB_SELFTEST_THREAD_NAME    "arbtst"
+#define ARB_SELFTEST_THREAD_STACK   TASK_STACK_ARB_SELFTEST
+#define ARB_SELFTEST_THREAD_PRIO    24U
+#define ARB_SELFTEST_THREAD_TICK    10U
+#define ARB_SELFTEST_BOOT_DELAY_MS  3000U
+#define ARB_SELFTEST_STEP_MS        3000U
+
+static void arb_selftest_send(uint8_t device_id, uint8_t priority,
+                              uint8_t cmd_type, uint8_t duty_pct, rt_bool_t urgent)
+{
+    rt_err_t ret = Arb_SendCommand(ARB_SELFTEST_AXIS_ID, device_id, priority,
+                                   cmd_type, duty_pct, urgent);
+    if (ret != RT_EOK) {
+        ARB_PRINT("selftest send fail dev=%u cmd=%u err=%d",
+                  (unsigned)device_id, (unsigned)cmd_type, (int)ret);
+    }
+}
+
+static void arb_selftest_thread_entry(void *param)
+{
+    (void)param;
+    rt_thread_mdelay(ARB_SELFTEST_BOOT_DELAY_MS);
+    ARB_PRINT("selftest start");
+
+    /* st1: power 允许正转 -> [ARB] fwd duty=85 */
+    arb_selftest_send((uint8_t)DEV_ID_POWER_POS, (uint8_t)PRIO_POWER,
+                      (uint8_t)CMD_TYPE_RUN_FWD, 85U, RT_FALSE);
+    rt_thread_mdelay(ARB_SELFTEST_STEP_MS);
+
+    /* st2: CAN 优先级更高 -> [ARB] rev duty=70 */
+    arb_selftest_send((uint8_t)DEV_ID_CAN, (uint8_t)PRIO_CAN,
+                      (uint8_t)CMD_TYPE_RUN_REV, 70U, RT_FALSE);
+    rt_thread_mdelay(ARB_SELFTEST_STEP_MS);
+
+    /* st3: 限位阻塞正转（urgent 插队）-> 维持 REV，block_fwd=1 */
+    arb_selftest_send((uint8_t)DEV_ID_LIMIT_FWD, (uint8_t)PRIO_LIMIT,
+                      (uint8_t)CMD_TYPE_BLOCK_FWD, 0U, RT_TRUE);
+    rt_thread_mdelay(ARB_SELFTEST_STEP_MS);
+
+    /* st4: 解除阻塞 -> 维持 REV（CAN 仍压过 POWER） */
+    arb_selftest_send((uint8_t)DEV_ID_LIMIT_FWD, (uint8_t)PRIO_LIMIT,
+                      (uint8_t)CMD_TYPE_UNBLOCK_FWD, 0U, RT_FALSE);
+    rt_thread_mdelay(ARB_SELFTEST_STEP_MS);
+
+    /* st5: 同设备 CAN 双向请求 -> 冲突停机 conflict_fault=1 */
+    arb_selftest_send((uint8_t)DEV_ID_CAN, (uint8_t)PRIO_CAN,
+                      (uint8_t)CMD_TYPE_RUN_FWD, 60U, RT_FALSE);
+    rt_thread_mdelay(ARB_SELFTEST_STEP_MS);
+
+    /* st6: 急停 -> 清允许队列，STOP */
+    arb_selftest_send((uint8_t)DEV_ID_EMERGENCY, (uint8_t)PRIO_EMERGENCY,
+                      (uint8_t)CMD_TYPE_EMERGENCY_STOP, 0U, RT_TRUE);
+    rt_thread_mdelay(ARB_SELFTEST_STEP_MS);
+
+    /* st7: power 正转恢复 -> [ARB] fwd duty=85 */
+    arb_selftest_send((uint8_t)DEV_ID_POWER_POS, (uint8_t)PRIO_POWER,
+                      (uint8_t)CMD_TYPE_RUN_FWD, 85U, RT_FALSE);
+    rt_thread_mdelay(ARB_SELFTEST_STEP_MS);
+
+    /* st8: 急停收尾 -> STOP，自测结束 */
+    arb_selftest_send((uint8_t)DEV_ID_EMERGENCY, (uint8_t)PRIO_EMERGENCY,
+                      (uint8_t)CMD_TYPE_EMERGENCY_STOP, 0U, RT_TRUE);
+    ARB_PRINT("selftest done");
+
+    while (1) {
+        rt_thread_mdelay(60000U);
+    }
+}
+
+static void Arb_SelfTest_Start(void)
+{
+    rt_thread_t t = rt_thread_create(ARB_SELFTEST_THREAD_NAME, arb_selftest_thread_entry, RT_NULL,
+                                     ARB_SELFTEST_THREAD_STACK, ARB_SELFTEST_THREAD_PRIO, ARB_SELFTEST_THREAD_TICK);
+    if (t != RT_NULL) {
+        rt_thread_startup(t);
+    }
+    else {
+        ARB_PRINT("selftest thread create failed");
+    }
+}
+#endif /* DEV_ENABLE_ARB_SELFTEST */
+
 int main(void)
 {
+    MAIN_D("fw build 2026-08-29-arb2 (sm diag + rtt sync)");
     /* 时钟频率打印 + TMR6 us 时间基准初始化 */
     Print_All_Clock_Freq();
     /* 通用 us 计时器：绑定 HC32 TMR6 驱动并启动 */
@@ -127,9 +237,11 @@ int main(void)
 
     Di_Task_Start();     /* DI 采集任务（10ms：电源极性扫描，事件在设备内发） */
 
-    Act_Arbitrator_Init();    /* 仲裁占位：方向 g_act_dir（Watch 可改） */
-
     Rod_Task_Start();         /* 推杆位置/状态 10ms 更新 */
+
+#if DEV_ENABLE_ARB_SELFTEST
+    Arb_SelfTest_Start();     /* 仲裁台架自测线程（DEV_ENABLE_ARB_SELFTEST=0 关闭） */
+#endif
 
     Task_Stack_Dump();          /* 打印各线程栈大小 + 总栈 + 堆余量 */
 

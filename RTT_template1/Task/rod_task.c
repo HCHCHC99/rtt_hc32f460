@@ -23,6 +23,8 @@ static void Actuator_Tick(uint32_t tick)
     for (uint8_t i = 0U; i < MAX_AXIS_NUM; i++) {
         Axis_t *axis = &mySystem.axis[i];
         int32_t delta;
+        ArbData_t arb;
+        RodDirection_t dir = ROD_DIR_STOP;
 
         if (axis->dir == ACT_DIR_NONE) {
             continue;   /* 未配置轴跳过 */
@@ -44,8 +46,16 @@ static void Actuator_Tick(uint32_t tick)
         RodState_SetSensorFault(&axis->state,
                                 (axis->state.max_limit_switch && axis->state.min_limit_switch));
 
-        /* 5. 方向指令（仲裁占位）+ 状态更新 */
-        RodState_Update(&axis->sm_act, &axis->state, Arbitrator_GetDirection(i), tick);
+        /* 5. 方向指令（仲裁；禁用/读取失败一律视为停止）+ 状态更新 */
+        if ((Arb_GetData(i, &arb) == RT_EOK) && (arb.enable != 0U)) {
+            if (arb.active_dir == DIR_FWD) {
+                dir = ROD_DIR_FWD;
+            }
+            else if (arb.active_dir == DIR_REV) {
+                dir = ROD_DIR_REV;
+            }
+        }
+        RodState_Update(&axis->sm_act, &axis->state, dir, tick);
     }
 }
 

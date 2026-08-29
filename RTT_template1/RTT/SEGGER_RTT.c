@@ -107,7 +107,7 @@ Additional information:
 #endif
 
 #ifndef   BUFFER_SIZE_UP
-  #define BUFFER_SIZE_UP                                  1024  // Size of the buffer for terminal output of target, up to host
+  #define BUFFER_SIZE_UP                                  4096  // 1KB 在启动打印突发时会被 J-Link 排空速度追上，NO_BLOCK_SKIP 模式整条丢弃，扩到 4KB
 #endif
 
 #ifndef   BUFFER_SIZE_DOWN

@@ -13,6 +13,7 @@
 #include "Dev/dev_power/dev_bus_voltage.h"
 #include "Dev/dev_power/dev_polarity.h"
 #include "Dev/dev_monitor/dev_monitor.h"
+#include "Dev/dev_act/dev_act.h"
 #include <rtthread.h>
 
 
@@ -31,6 +32,21 @@ int Dev_Registry_Add(const SysModule_t *module)
     }
     s_modules[s_module_num++] = *module;
     DEV_REG_PRINT("register %s", module->name);
+
+    if (module->init != RT_NULL) {
+        module->init();
+    }
+
+    if (module->thread_entry != RT_NULL) {
+        rt_thread_t thread = rt_thread_create(module->name, module->thread_entry, RT_NULL,
+                                              module->thread_stack, module->prio, 10);
+        if (thread != RT_NULL) {
+            rt_thread_startup(thread);
+        } else {
+            MAIN_D("[DEV_REG] thread create failed: %s", module->name);
+        }
+    }
+
     return 0;
 }
 
@@ -100,6 +116,13 @@ void Dev_RegisterAll(void)
     static const SysModule_t s_monitor_module =
         SYS_MODULE_REGISTER("monitor", Monitor_Init, Monitor_Task, DEV_PRIO_MONITOR, 100);
     Dev_Registry_Add(&s_monitor_module);
+#endif
+#if DEV_ENABLE_ACT_ARB
+    /* C 模式：仲裁线程（rt_mq + 每轴互斥量），线程由 registry 创建命名 "act" */
+    static const SysModule_t s_act_module =
+        SYS_MODULE_REGISTER_THREAD(act, Arb_Module_Init, Arb_ThreadEntry,
+                                   ARB_THREAD_PRIORITY, ARB_THREAD_STACK_SIZE);
+    Dev_Registry_Add(&s_act_module);
 #endif
 
 } 
