@@ -14,6 +14,7 @@
 #define DEV_ENABLE_MONITOR          1   /* 系统观测模块（Watch 用全局 g_monitor） */
 #define DEV_ENABLE_ACT_ARB          1   /* 电机仲裁模块（C 模式：rt_mq + 每轴互斥量 + 仲裁线程） */
 #define DEV_ENABLE_ARB_SELFTEST     1   /* 仲裁台架自测线程（无串口命令注入用；量产置 0） */
+#define DEV_ENABLE_PWM              1   /* 电机 PWM 输出设备（仲裁输出接缝：fwd/rev/stop ops） */
 
 /* ============ 设备优先级常量（数字越小优先级越高，与 dev_registry 语义一致） ============ */
 #define DEV_PRIO_HIGH               2

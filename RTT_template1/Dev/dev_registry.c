@@ -14,6 +14,7 @@
 #include "Dev/dev_power/dev_polarity.h"
 #include "Dev/dev_monitor/dev_monitor.h"
 #include "Dev/dev_act/dev_act.h"
+#include "Dev/dev_pwm.h"
 #include <rtthread.h>
 
 
@@ -122,6 +123,12 @@ void Dev_RegisterAll(void)
         SYS_MODULE_REGISTER_THREAD(act, Arb_Module_Init, Arb_ThreadEntry,
                                    ARB_THREAD_PRIORITY, ARB_THREAD_STACK_SIZE);
     Dev_Registry_Add(&s_act_module);
+#endif
+#if DEV_ENABLE_PWM
+    /* PWM 输出设备：init 绑定仲裁输出 ops（fwd/rev/stop → 真实 TMRA4 PWM） */
+    static const SysModule_t s_pwm_module =
+        SYS_MODULE_REGISTER(pwm, Dev_Pwm_Init, RT_NULL, DEV_PRIO_MID, 0);
+    Dev_Registry_Add(&s_pwm_module);
 #endif
 
 } 
