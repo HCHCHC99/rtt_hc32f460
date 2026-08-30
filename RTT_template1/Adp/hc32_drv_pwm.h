@@ -11,7 +11,7 @@
 #include "hc32_ll_tmra.h"
 #include "hc32_ll_gpio.h"
 
-#define PWM_TMRA_CLK_HZ     (50000000UL)    /* TMRA4 计数时钟 = PCLK2（CLK_DIV1）；示波器实测校准 */
+#define PWM_TMRA_CLK_HZ     (100000000UL)   /* TMRA4 计数时钟 = PCLK1（官方 Readme：TimerA 钟源是 PCLK1；示波器实测 80us/7692 反推吻合） */
 #define PWM_FREQ_DFT_HZ     (6500U)         /* 默认 PWM 频率（hkb_1 实测配置） */
 #define PWM_FREQ_MIN_HZ     (10000U)        /* 运行中改频下限（仅 PwmHw_SetFreq 用） */
 #define PWM_FREQ_MAX_HZ     (20000U)        /* 运行中改频上限 */
@@ -37,7 +37,11 @@
 void PwmHw_ChannelInit(uint8_t u8Port, uint16_t u16Pin, CM_TMRA_TypeDef *TMRAx,
                        uint32_t u32Ch, float fInitDutyPct, uint8_t u8LowActive);
 void PwmHw_SetDutyPct(CM_TMRA_TypeDef *TMRAx, uint32_t u32Ch, float fDutyPct);
+void PwmHw_SetCompareValue(CM_TMRA_TypeDef *TMRAx, uint32_t u32Ch, uint32_t u32CmpVal);
+void PwmHw_SetForcePolarity(CM_TMRA_TypeDef *TMRAx, uint32_t u32Ch, uint16_t u16Polarity);
 void PwmHw_CompareEnable(CM_TMRA_TypeDef *TMRAx, uint32_t u32Ch);
 void PwmHw_CompareDisable(CM_TMRA_TypeDef *TMRAx, uint32_t u32Ch);
+/* 诊断：实测 TMRA 计数时钟（100us 窗口采样反推，Hz） */
+uint32_t PwmHw_ProbeCountClock(CM_TMRA_TypeDef *tmra, uint32_t period);
 
 #endif /* __HC32_DRV_PWM_H__ */

@@ -1,3 +1,4 @@
+#include <Adp/hc32_drv_timer.h>
 /*
  * Copyright (c) 2006-2022, RT-Thread Development Team
  * Copyright (c) 2022, Xiaohua Semiconductor Co., Ltd.
@@ -21,7 +22,6 @@
 #include "Dev/dev_mgr/dev_state.h"
 #include "Dev/dev_adc/dev_adc.h"
 #include "Adp/hc32_drv_adc.h"
-#include "Adp/hc_drv_timer.h"
 #include "Utils/us_timer.h"
 #include "Dev/dev_power/dev_cur_sensor.h"
 #include "Dev/dev_power/dev_bus_voltage.h"

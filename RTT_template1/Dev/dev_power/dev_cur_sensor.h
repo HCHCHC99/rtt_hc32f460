@@ -9,7 +9,7 @@
 
 /* ===================== 模拟模式 ===================== */
 /* 1=模拟：1ms 检测不读 ADC，改用 g_cur_sim_ma 直接赋值（表达式窗口实时可改，单位 mA） */
-#define CUR_SIM_MODE_EN         (0)
+#define CUR_SIM_MODE_EN         (1)
 extern volatile uint32_t g_cur_sim_ma;    /* 模拟电流 mA（初值见 .c，可实时改） */
 
 /* 阈值配置（RAM 变量，debugger 可实时改；默认见 .c） */

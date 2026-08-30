@@ -8,7 +8,7 @@
 #define __DEV_PWM_H__
 
 /* 设备级可调项（硬件无关）：运行侧占空比 2%，互补侧 98%（hkb_1 实测配置） */
-#define PWM_RUN_DUTY_PCT    2U
+#define PWM_RUN_DUTY_PCT    20U
 
 void Dev_Pwm_Init(void);       /* 注册表 init：通道创建 + 硬件初始化 + 绑定仲裁输出 */
 void Dev_Pwm_Task(void);       /* 预留：非阻塞斜坡推进（当前未启用 ramp） */

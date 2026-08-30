@@ -1,9 +1,9 @@
+#include <Adp/hc32_drv_timer.h>
 /**
  * @file    hc_drv_timer.c
  * @brief   HC32 TMR6 微秒级时间基准驱动（实现 Utils/us_timer 接口）
  * @note    移植自 HB_chuchai_v6.0.4；TMR6_2，PCLK0/64，16 位锯齿（回绕）计数
  */
-#include "hc_drv_timer.h"
 #include "Utils/us_timer.h"
 #include "applications/rtt_manager.h"
 #include "hc32_ll_tmr6.h"

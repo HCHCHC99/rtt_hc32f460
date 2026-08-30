@@ -1,3 +1,4 @@
+#include <Adp/hc32_drv_timer.h>
 /**
  * @file    dev_state.c
  * @brief   系统状态机实现（表驱动移植 + 故障联动）
@@ -12,7 +13,6 @@
 #include "rtt_manager.h"
 #include "Utils/us_timer.h"
 #include "Dev/dev_registry.h"
-#include "Adp/hc_drv_timer.h"
 #include "Dev/dev_adc/dev_adc.h"
 #include "Dev/dev_power/dev_power_isr.h"
 #include "Dev/dev_act/dev_act.h"
