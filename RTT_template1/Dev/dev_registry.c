@@ -14,7 +14,7 @@
 #include "Dev/dev_power/dev_polarity.h"
 #include "Dev/dev_monitor/dev_monitor.h"
 #include "Dev/dev_act/dev_act.h"
-#include "Dev/dev_pwm.h"
+#include "Dev/dev_pwm/dev_pwm.h"
 #include <rtthread.h>
 
 
