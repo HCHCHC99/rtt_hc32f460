@@ -14,6 +14,7 @@
 volatile VoltCfg_t g_volt_cfg = {
     VOL_OVER_TH_DFT, VOL_UNDER_TH_DFT, VOL_HYST_DFT, VOL_RECOVER_DELAY_MS_DFT,
 };
+volatile uint32_t g_volt_sim_mv = 21500U;   /* 模拟母线电压 mV（VOLT_SIM_MODE_EN=1 时生效） */
 
 static volatile float   s_fVolt;       /* 1ms ISR 写，主循环/GetInfo 读 */
 static volatile uint8_t s_u8Status;    /* 0 正常 1 欠压 2 过压 */
@@ -38,8 +39,12 @@ void BusVoltage_Isr1ms(void)
     uint8_t u8PrevFault;
     float fVolt = 0.0f;
 
+#if VOLT_SIM_MODE_EN
+    fVolt = (float)g_volt_sim_mv * 0.001f;   /* 模拟：直接赋值（ADC 换算与偏置一并旁路） */
+#else
     (void)Dev_Adc_GetMean(0U, &fVolt);   /* 10ms 滑动均值，单位 V（已含 150k:10k 分压换算） */
     fVolt += (VOL_OFFSET * 0.001f);      /* 偏置补偿：+1.2V（仅本模块，不影响 ADC 层） */
+#endif
     s_fVolt = fVolt;
 
     u8PrevFault = s_u8Fault;

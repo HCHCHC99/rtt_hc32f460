@@ -73,5 +73,8 @@ void Monitor_DumpStatus(void);        /* 1s 打印：系统状态机 + 过压/�
 void Monitor_DumpDev(void);
 void Monitor_DumpTask(void);
 
+/* 状态枚举 → 名字（诊断打印用；越界返回 UNK） */
+const char *Monitor_SysStateName(uint8_t state);
+
 #endif /* __DEV_MONITOR_H__ */
 

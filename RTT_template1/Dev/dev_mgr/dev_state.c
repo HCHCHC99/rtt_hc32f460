@@ -159,6 +159,58 @@ void Sys_State_Recover(void)
     }
 }
 
+/* 事件位图 → 名字串：诊断打印用（未知位保留为 0x..） */
+void Sys_EventBitsName(rt_uint32_t bits, char *buf, rt_uint32_t size)
+{
+    static const struct {
+        rt_uint32_t bit;
+        const char *name;
+    } s_evt_names[] = {
+        {EVT_SYS_INIT_DONE,       "INIT_DONE"},
+        {EVT_SYS_FAULT,           "FAULT"},
+        {EVT_SYS_EMERGENCY,       "EMERGENCY"},
+        {EVT_SYS_RECOVERY,        "RECOVERY"},
+        {EVT_SYS_VOLT_NORMAL,     "VOLT_NORMAL"},
+        {EVT_SYS_VOLT_OVER,       "VOLT_OVER"},
+        {EVT_SYS_VOLT_UNDER,      "VOLT_UNDER"},
+        {EVT_SYS_CMD_WORK_ENABLE, "WORK_ENABLE"},
+        {EVT_SYS_OVER_CURRENT,    "OVER_CURRENT"},
+        {EVT_SYS_ROD_LIMIT_FAULT, "ROD_LIMIT_FAULT"},
+        {EVT_SYS_ST_WORK_ERROR,   "ST_WORK_ERROR"},
+    };
+    rt_uint32_t i;
+    rt_uint32_t pos = 0U;
+    rt_uint32_t unknown = bits;
+
+    if ((buf == RT_NULL) || (size == 0U)) {
+        return;
+    }
+    buf[0] = '\0';
+
+    if (bits == 0U) {
+        (void)rt_snprintf(buf, size, "NONE");
+        return;
+    }
+
+    for (i = 0U; i < (rt_uint32_t)(sizeof(s_evt_names) / sizeof(s_evt_names[0])); i++) {
+        if ((bits & s_evt_names[i].bit) != 0U) {
+            unknown &= ~s_evt_names[i].bit;
+            pos += (rt_uint32_t)rt_snprintf(buf + pos, size - pos, "%s%s",
+                                            (pos != 0U) ? "|" : "",
+                                            s_evt_names[i].name);
+            if (pos >= size) {
+                pos = size - 1U;
+                buf[pos] = '\0';
+            }
+        }
+    }
+
+    if (unknown != 0U) {
+        (void)rt_snprintf(buf + pos, size - pos, "%s0x%08x",
+                          (pos != 0U) ? "|" : "", (unsigned)unknown);
+    }
+}
+
 /* 状态跳转打印：更新并输出全局 us 时间戳 */
 static void sys_state_log_enter(const char *name)
 {

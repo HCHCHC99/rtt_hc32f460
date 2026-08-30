@@ -64,17 +64,15 @@ static void rod_thread_entry(void *param)
     (void)param;
     while (1) {
         Actuator_Tick(rt_tick_get());
+        Task_Set_Beat();
         rt_thread_mdelay(ROD_SCAN_PERIOD_MS);
     }
 }
 
 void Rod_Task_Start(void)
 {
-    rt_thread_t t = rt_thread_create("rod", rod_thread_entry, RT_NULL,
-                                     ROD_THREAD_STACK, ROD_THREAD_PRIO, ROD_THREAD_TICK);
-    if (t != RT_NULL) {
-        rt_thread_startup(t);
-    }
+    (void)Task_Set_Create("rod", rod_thread_entry, RT_NULL,
+                          ROD_THREAD_STACK, ROD_THREAD_PRIO, 100U);
 }
 
 /* EOF */

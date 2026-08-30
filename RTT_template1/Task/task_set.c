@@ -1,10 +1,10 @@
 /**
- * @file    task_stack.c
- * @brief   任务栈统一管理实现：集中登记各线程栈大小，打印总栈与堆余量
- * @note    所有栈大小唯一来源在 task_stack.h（TASK_STACK_*）；
+ * @file    task_set.c
+ * @brief   任务配置统一管理实现：栈/优先级登记 + 统一线程创建 + 饿死防护
+ * @note    所有栈大小与优先级唯一来源在 task_set.h（TASK_STACK_ 与 TASK_PRIO_ 系列）；
  *          rtconfig.h / rod_task.h / di_task.h / led_task.h / dev_model.h / dev_registry.h 均引用它。
  */
-#include "task_stack.h"
+#include "task_set.h"
 #include "applications/rtt_manager.h"
 #include <rtthread.h>
 #include <rthw.h>   /* rt_hw_interrupt_disable / enable */
@@ -23,10 +23,115 @@ static TaskStackItem_t s_task_stack[] = {
     { "tidle0",   (uint32_t)TASK_STACK_IDLE,  UINT32_MAX, 0U },
     { "sys workq", (uint32_t)TASK_STACK_WORKQ, UINT32_MAX, 0U },
     { "timer",    (uint32_t)TASK_STACK_TIMER, UINT32_MAX, 0U },
+    { "canary",   (uint32_t)TASK_STACK_CANARY, UINT32_MAX, 0U },
 };
 #define TASK_STACK_NUM  (sizeof(s_task_stack) / sizeof(s_task_stack[0]))
 
 static uint32_t Task_Stack_Free(const struct rt_thread *t);
+
+/* ============ 饿死检测：每任务心跳登记表，超时点名 ============ */
+#define TASK_SET_BEAT_SLOTS 12U
+typedef struct {
+    const char *name;
+    void       *tcb;
+    uint8_t     prio;
+    uint32_t    beat_ms;      /* 0 = 不检测（事件驱动线程） */
+    uint32_t    last_beat;
+} TaskBeatItem_t;
+static TaskBeatItem_t s_beat[TASK_SET_BEAT_SLOTS];
+static uint8_t s_beat_num = 0U;
+
+/* ============ 统一线程创建（栈/优先级检查 + 失败打印） ============ */
+void *Task_Set_Create(const char *name, void (*entry)(void *), void *param,
+                      uint32_t stack, uint8_t prio, uint32_t beat_ms)
+{
+    rt_thread_t t;
+
+    if ((name == RT_NULL) || (entry == RT_NULL) ||
+        (stack < TASK_STACK_MIN) ||
+        (prio == 0U) || (prio >= (uint8_t)RT_THREAD_PRIORITY_MAX - 1U)) {
+        TASK_STACK_PRINT("reject %s stack=%u prio=%u (min stack=%u, prio 1..%u)",
+                         (name != RT_NULL) ? name : "null", (unsigned)stack,
+                         (unsigned)prio, (unsigned)TASK_STACK_MIN,
+                         (unsigned)(RT_THREAD_PRIORITY_MAX - 2U));
+        return RT_NULL;
+    }
+
+    t = rt_thread_create(name, entry, param, stack, prio, 10);
+    if (t == RT_NULL) {
+        TASK_STACK_PRINT("create failed %s (heap?)", name);
+        return RT_NULL;
+    }
+
+    if (rt_thread_startup(t) != RT_EOK) {
+        TASK_STACK_PRINT("startup failed %s", name);
+        return RT_NULL;
+    }
+
+    if (s_beat_num < TASK_SET_BEAT_SLOTS) {
+        s_beat[s_beat_num].name = name;
+        s_beat[s_beat_num].tcb = (void *)t;
+        s_beat[s_beat_num].prio = prio;
+        s_beat[s_beat_num].beat_ms = beat_ms;
+        s_beat[s_beat_num].last_beat = (uint32_t)rt_tick_get();   /* 出生即计时刻：出生就被饿死的任务也能被点名 */
+        s_beat_num++;
+    }
+
+    return (void *)t;
+}
+
+/* 周期任务循环内调用：按当前线程 TCB 匹配心跳槽位并刷新 */
+void Task_Set_Beat(void)
+{
+    rt_thread_t self = rt_thread_self();
+    uint8_t i;
+
+    for (i = 0U; i < s_beat_num; i++) {
+        if (s_beat[i].tcb == (void *)self) {
+            s_beat[i].last_beat = (uint32_t)rt_tick_get();
+            return;
+        }
+    }
+}
+
+#if TASK_SET_STARVATION_GUARD_EN
+static void Task_Set_CanaryEntry(void *param)
+{
+    (void)param;
+    while (1) {
+        Task_Set_Beat();
+        rt_thread_mdelay(TASK_SET_CANARY_PERIOD_MS);
+    }
+}
+#endif
+
+void Task_Set_Start(void)
+{
+#if TASK_SET_STARVATION_GUARD_EN
+    if (Task_Set_Create("canary", Task_Set_CanaryEntry, RT_NULL,
+                        TASK_STACK_CANARY, (uint8_t)TASK_PRIO_CANARY, 500U) == RT_NULL) {
+        TASK_STACK_PRINT("canary create failed - starvation guard off");
+    }
+#endif
+}
+
+void Task_Set_StarvationCheck(void)
+{
+#if TASK_SET_STARVATION_GUARD_EN
+    uint32_t now = (uint32_t)rt_tick_get();
+    uint8_t i;
+    for (i = 0U; i < s_beat_num; i++) {
+        if ((s_beat[i].beat_ms != 0U) && (s_beat[i].last_beat != 0U)) {
+            uint32_t stale = now - s_beat[i].last_beat;
+            if (stale > TASK_SET_BEAT_TIMEOUT_MS) {
+                MAIN_D("[TASK_SET] STARVED %s prio=%u stale=%ums (beat=%ums)",
+                       s_beat[i].name, (unsigned)s_beat[i].prio,
+                       (unsigned)stale, (unsigned)s_beat[i].beat_ms);
+            }
+        }
+    }
+#endif
+}
 
 /* 打印所有任务栈大小 + 总栈 + 堆余量 */
 void Task_Stack_Dump(void)
@@ -150,11 +255,6 @@ void Task_Stack_Monitor(void)
         (void)Task_Stack_UpdateWatermark(t, free_bytes);
         used = Task_Stack_Used(size, free_bytes);
         pct = used * 100U / size;
-        TASK_STACK_PRINT("===== AAAA  %s sp=0x%08x base=0x%08x size=%u used=%u(%u%%)  =====",
-                t->name,
-                (unsigned)(rt_ubase_t)t->sp,
-                (unsigned)(rt_ubase_t)t->stack_addr,
-                (unsigned)size, (unsigned)used, (unsigned)pct);
         if (pct >= (uint32_t)TASK_STACK_WARN_PCT) {
             TASK_STACK_PRINT("WARN %s sp=0x%08x base=0x%08x size=%u used=%u(%u%%)",
                              t->name,

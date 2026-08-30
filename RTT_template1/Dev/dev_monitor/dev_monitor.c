@@ -28,6 +28,15 @@ static const char *const s_pol_name[] = {
     "UNKNOWN", "UNPOWERED", "FWD", "REV", "ABNORMAL",
 };
 
+/* 状态枚举 → 名字（诊断打印用；越界返回 UNK） */
+const char *Monitor_SysStateName(uint8_t state)
+{
+    if (state >= (uint8_t)(sizeof(s_sys_state_name) / sizeof(s_sys_state_name[0]))) {
+        return "UNK";
+    }
+    return s_sys_state_name[state];
+}
+
 void Monitor_Init(void)
 {
     memset((void *)&g_monitor, 0, sizeof(g_monitor));

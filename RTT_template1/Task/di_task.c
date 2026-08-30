@@ -15,17 +15,15 @@ static void di_thread_entry(void *param)
     while (1) {
         Polarity_Scan();              /* 设备扫描：内部读 GPIO + 窗口判定 + 跳变发事件 */
         /* 未来: Limit_Scan(); */
+        Task_Set_Beat();
         rt_thread_mdelay(DI_SCAN_PERIOD_MS);
     }
 }
 
 void Di_Task_Start(void)
 {
-    rt_thread_t t = rt_thread_create("di", di_thread_entry, RT_NULL,
-                                     DI_THREAD_STACK, DI_THREAD_PRIO, DI_THREAD_TICK);
-    if (t != RT_NULL) {
-        rt_thread_startup(t);
-    }
+    (void)Task_Set_Create("di", di_thread_entry, RT_NULL,
+                          DI_THREAD_STACK, DI_THREAD_PRIO, 50U);
 }
 
 /* EOF */

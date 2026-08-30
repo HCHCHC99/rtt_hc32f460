@@ -24,6 +24,7 @@ static void led_thread_entry(void *param)
         UsTimer_UpdateTimestamp();
         t_us = (uint32_t)UsTimer_GetTimestampUs();
         LED_PRINT("%s t=%uus", (on ? "on" : "off"), t_us);
+        Task_Set_Beat();
         rt_thread_mdelay(LED_TOGGLE_MS);
     }
 }
@@ -33,11 +34,8 @@ void Led_Task_Start(void)
     /* 初始化 LED GPIO：推挽输出，初始低电平 */
     Output_GPIO_Init(LED_PORT, LED_PIN, GPIO_INIT_LOW);
 
-    rt_thread_t t = rt_thread_create("led", led_thread_entry, RT_NULL,
-                                     LED_THREAD_STACK, LED_THREAD_PRIO, LED_THREAD_TICK);
-    if (t != RT_NULL) {
-        rt_thread_startup(t);
-    }
+    (void)Task_Set_Create("led", led_thread_entry, RT_NULL,
+                          LED_THREAD_STACK, LED_THREAD_PRIO, 2000U);
 }
 
 /* EOF */

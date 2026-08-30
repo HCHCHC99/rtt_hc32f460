@@ -31,7 +31,7 @@
 #include "Task/led_task.h"
 #include "Task/di_task.h"
 #include "Task/rod_task.h"
-#include "Task/task_stack.h"
+#include "Task/task_set.h"
 #include "Dev/dev_act/dev_act.h"
 #include "Dev/dev_config.h"
 
@@ -68,9 +68,23 @@ static void cmd_sys_evt(int argc, char **argv)
 MSH_CMD_EXPORT_ALIAS(cmd_sys_evt, sys_evt, send system event bits (hex));
 
 /* 每 1s 打印采样结果：最新 AD 值、缓冲平均值、换算电流/电压（不打印浮点） */
+static const char *main_th_stat_name(int stat)
+{
+    switch (stat) {
+    case 0: return "INIT";
+    case 1: return "SUSPEND";
+    case 2: return "READY";
+    case 3: return "RUN";
+    default: return "?";
+    }
+}
+
 static void monitor_sample_1s(void)
 {
     uint16_t raw_v = 0U, raw_i = 0U;
+    int sm_cur = 0;
+    rt_uint32_t sm_evt = 0U;
+    char sm_evt_name[128];
     float v_avg = 0.0f, c_avg = 0.0f;
     float v_lst = 0.0f, c_lst = 0.0f;
     uint32_t v_avg_mv = 0U, v_lst_mv = 0U;
@@ -81,11 +95,14 @@ static void monitor_sample_1s(void)
     Polarity_PrintPending();   /* 线程上下文：刷新未打印的极性跳变（调试） */
     Monitor_DumpStatus();    /* 1s：系统状态机 + 过压/欠压/过流状态 */
     /* INIT 卡死诊断：状态 / 事件组未消费位 / sys_sm 线程是否存在，三样一屏定位 */
-    MAIN_D("[SM_DIAG] cur=%d evt_flag=0x%08x sys_sm=%s entered=%u recv=%u",
-           (int)mySystem.sys_sm.cur_state,
-           (unsigned)(mySystem.sys_evt ? mySystem.sys_evt->set : 0U),
-           rt_thread_find((char *)"sys_sm") ? "yes" : "no",
-           (unsigned)g_sm_diag_entered, (unsigned)g_sm_diag_recv_ok);
+    sm_cur = (int)mySystem.sys_sm.cur_state;
+    sm_evt = (mySystem.sys_evt != RT_NULL) ? mySystem.sys_evt->set : 0U;
+    Sys_EventBitsName(sm_evt, sm_evt_name, (uint32_t)sizeof(sm_evt_name));
+    SM_DIAG_PRINT("cur=%d(%s) evt=0x%08x(%s) sys_sm=%s entered=%u recv=%u",
+                  sm_cur, Monitor_SysStateName((uint8_t)sm_cur),
+                  (unsigned)sm_evt, sm_evt_name,
+                  rt_thread_find((char *)"sys_sm") ? "yes" : "no",
+                  (unsigned)g_sm_diag_entered, (unsigned)g_sm_diag_recv_ok);
     /* 线程调度真相：全线程调度状态 + 优先级（谁没启动/谁在空转一目了然）
        stat 含义: 0=INIT 1=SUSPEND 2=READY 3=RUNNING 4=CLOSE */
     {
@@ -94,10 +111,16 @@ static void monitor_sample_1s(void)
         for (node = info->object_list.next; node != &(info->object_list); node = node->next)
         {
             rt_thread_t t = (rt_thread_t)rt_list_entry(node, struct rt_object, list);
-            MAIN_D("[TH_DIAG] %-8s stat=%d prio=%d",
-                   t->name, (int)(t->stat & RT_THREAD_STAT_MASK), (int)t->current_priority);
+            char th_name[RT_NAME_MAX + 1];
+            rt_memcpy(th_name, t->name, RT_NAME_MAX);
+            th_name[RT_NAME_MAX] = '\0';
+            TH_DIAG_PRINT("%-8s stat=%d(%s) prio=%d",
+                          th_name, (int)(t->stat & RT_THREAD_STAT_MASK),
+                          main_th_stat_name((int)(t->stat & RT_THREAD_STAT_MASK)),
+                          (int)t->current_priority);
         }
     }
+    Task_Set_StarvationCheck();  /* starvation guard */
     t_us = (uint32_t)UsTimer_GetTimestampUs();
 
     Dev_Adc_GetRaw(0, &raw_v);
@@ -129,7 +152,6 @@ volatile int test = 0;
 #define ARB_SELFTEST_AXIS_ID        0U
 #define ARB_SELFTEST_THREAD_NAME    "arbtst"
 #define ARB_SELFTEST_THREAD_STACK   TASK_STACK_ARB_SELFTEST
-#define ARB_SELFTEST_THREAD_PRIO    24U
 #define ARB_SELFTEST_THREAD_TICK    10U
 #define ARB_SELFTEST_BOOT_DELAY_MS  3000U
 #define ARB_SELFTEST_STEP_MS        3000U
@@ -198,12 +220,8 @@ static void arb_selftest_thread_entry(void *param)
 
 static void Arb_SelfTest_Start(void)
 {
-    rt_thread_t t = rt_thread_create(ARB_SELFTEST_THREAD_NAME, arb_selftest_thread_entry, RT_NULL,
-                                     ARB_SELFTEST_THREAD_STACK, ARB_SELFTEST_THREAD_PRIO, ARB_SELFTEST_THREAD_TICK);
-    if (t != RT_NULL) {
-        rt_thread_startup(t);
-    }
-    else {
+    if (Task_Set_Create(ARB_SELFTEST_THREAD_NAME, arb_selftest_thread_entry, RT_NULL,
+                        ARB_SELFTEST_THREAD_STACK, TASK_PRIO_ARB_SELFTEST, 0U) == RT_NULL) {
         ARB_PRINT("selftest thread create failed");
     }
 }
@@ -222,6 +240,7 @@ int main(void)
     /* ADC 设备：绑定 HC32 底层驱动（dev_adc_ops），注册即 init（TMR0_1+AOS 已配置，未启动） */
     Dev_Adc_Bind(&hc32_adc_ops);
     Dev_RegisterAll();
+    Task_Set_Start();     /* Starvation guard: lowest-prio canary */
 
     RttManager_DumpSwitches();
 
@@ -250,7 +269,7 @@ int main(void)
     {
         test++;
 
-        rt_thread_mdelay(1000);
+        rt_thread_mdelay(2000);
         monitor_sample_1s();
     }
 }

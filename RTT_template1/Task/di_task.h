@@ -6,12 +6,12 @@
 #ifndef __DI_TASK_H__
 #define __DI_TASK_H__
 
-#include "Task/task_stack.h"   /* 栈大小统一管理 */
+#include "Task/task_set.h"     /* 栈大小/优先级统一管理 */
 
 /* 默认配置宏（统一放头文件） */
 #define DI_SCAN_PERIOD_MS    (2U)     /* DI 采样周期 ms：2ms */
-#define DI_THREAD_STACK      TASK_STACK_DI   /* 引用 task_stack.h 唯一来源 */
-#define DI_THREAD_PRIO       (22)     /* 中优先级，早于低优先级的 LED/监控 */
+#define DI_THREAD_STACK      TASK_STACK_DI   /* 引用 task_set.h 唯一来源 */
+#define DI_THREAD_PRIO       TASK_PRIO_DI     /* 中优先级，早于低优先级的 LED/监控 */
 #define DI_THREAD_TICK       (10)
 
 /* 初始化并启动 DI 采集线程 */

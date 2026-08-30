@@ -2,12 +2,12 @@
 #define __DEV_REGISTRY_H__
 
 #include <stdint.h>
-#include "Task/task_stack.h"   /* 栈大小统一管理 */
+#include "Task/task_set.h"     /* 栈大小/优先级统一管理 */
 
 /* 配置宏（统一放头文件） */
 #define MAX_REG_MODULES         (16U)
 #define DEV_THREAD_STACK_SIZE   TASK_STACK_DEV
-#define DEV_THREAD_PRIORITY     (20)
+#define DEV_THREAD_PRIORITY     TASK_PRIO_DEV
 #define DEV_THREAD_TICK         (10)
 
 typedef struct {

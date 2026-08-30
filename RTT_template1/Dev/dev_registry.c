@@ -38,11 +38,8 @@ int Dev_Registry_Add(const SysModule_t *module)
     }
 
     if (module->thread_entry != RT_NULL) {
-        rt_thread_t thread = rt_thread_create(module->name, module->thread_entry, RT_NULL,
-                                              module->thread_stack, module->prio, 10);
-        if (thread != RT_NULL) {
-            rt_thread_startup(thread);
-        } else {
+        if (Task_Set_Create(module->name, module->thread_entry, RT_NULL,
+                            module->thread_stack, module->prio, 0U) == RT_NULL) {
             MAIN_D("[DEV_REG] thread create failed: %s", module->name);
         }
     }
@@ -78,8 +75,10 @@ void Dev_Registry_UpdateAll(void)
 void Dev_Thread_Entry(void *param)
 {
     (void)param;
+    MAIN_D_SYNC("[DEV_REG] dev thread entry");
     while (1) {
         Dev_Registry_UpdateAll();
+        Task_Set_Beat();
         rt_thread_mdelay(1);
     }
 }
@@ -129,10 +128,8 @@ void Dev_RegisterAll(void)
 
 int Dev_Start(void)
 {
-    rt_thread_t t = rt_thread_create("dev", Dev_Thread_Entry, RT_NULL,
-                                     DEV_THREAD_STACK_SIZE, DEV_THREAD_PRIORITY, DEV_THREAD_TICK);
-    if (t != RT_NULL) {
-        rt_thread_startup(t);
+    if (Task_Set_Create("dev", Dev_Thread_Entry, RT_NULL,
+                        DEV_THREAD_STACK_SIZE, DEV_THREAD_PRIORITY, 500U) != RT_NULL) {
         return 0;
     }
     return -1;

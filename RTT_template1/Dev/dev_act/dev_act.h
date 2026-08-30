@@ -9,7 +9,7 @@
 
 #include <stdint.h>
 #include <rtthread.h>
-#include "Task/task_stack.h"   /* TASK_STACK_ARB: stack sizes single source */
+#include "Task/task_set.h"     /* TASK_STACK_ARB / TASK_PRIO_ACT: single source */
 
 /* Module configuration */
 #define ARB_MAX_AXIS_NUM            2U     /* keep in sync with MAX_AXIS_NUM (dev_model.h) */
@@ -17,7 +17,7 @@
 #define ARB_MQ_NAME                 "arb_mq"
 #define ARB_MQ_DEPTH                16U
 #define ARB_THREAD_STACK_SIZE       TASK_STACK_ARB
-#define ARB_THREAD_PRIORITY         15U    /* registry (C mode) creates and names the thread "act" */
+#define ARB_THREAD_PRIORITY         TASK_PRIO_ACT    /* registry (C mode) creates and names the thread "act" */
 
 /* Debug print switch and wrapper are added by rtt_manager.h during integration */
 

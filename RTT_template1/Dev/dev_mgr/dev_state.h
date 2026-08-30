@@ -36,6 +36,9 @@ void Sys_Event_Send(rt_uint32_t bits);
 /* 手动恢复：清故障码 + 发 EVT_SYS_RECOVERY（触发方式后续接入 MSH/按键） */
 void Sys_State_Recover(void);
 
+/* 事件位图 → 名字串（诊断打印；如 "INIT_DONE|WORK_ENABLE"，空集为 "NONE"） */
+void Sys_EventBitsName(rt_uint32_t bits, char *buf, rt_uint32_t size);
+
 #endif /* __DEV_STATE_H__ */
 
 

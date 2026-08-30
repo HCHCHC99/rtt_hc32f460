@@ -16,6 +16,7 @@
 volatile CurCfg_t g_cur_cfg = {
     CUR_OVER_CUR_TH_MA_DFT, CUR_OVER_WINDOW_MS_DFT,
 };
+volatile uint32_t g_cur_sim_ma = 500U;    /* 模拟电流 mA（CUR_SIM_MODE_EN=1 时生效） */
 
 static volatile float    s_fCurrMa;      /* 1ms ISR 写，主循环/GetInfo 读 */
 static volatile uint8_t  s_u8Status;     /* 0 正常 1 过流 */
@@ -36,7 +37,11 @@ void CurrentSensor_Isr1ms(void)
     uint8_t u8Prev;
     float fCurrMa = 0.0f;
 
+#if CUR_SIM_MODE_EN
+    fCurrMa = (float)g_cur_sim_ma;         /* 模拟：直接赋值（ADC 读取一并旁路） */
+#else
     (void)Dev_Adc_GetMean(1U, &fCurrMa);   /* 10ms 滑动均值，单位 mA（已取绝对值） */
+#endif
     s_fCurrMa = fCurrMa;
 
     u8Prev = s_u8Status;

@@ -8,13 +8,13 @@
 #define __DEV_MODEL_H__
 
 #include "Utils/state_engine.h"
-#include "Task/task_stack.h"   /* 栈大小统一管理 */
+#include "Task/task_set.h"     /* 栈大小/优先级统一管理 */
 #include "Dev/dev_rod/dev_rod_position.h"
 #include "Dev/dev_rod/dev_rod_state.h"
 
 /* 系统状态机线程配置（统一放头文件） */
 #define SYS_SM_THREAD_STACK   TASK_STACK_SYS_SM
-#define SYS_SM_THREAD_PRIO    19
+#define SYS_SM_THREAD_PRIO    TASK_PRIO_SYS_SM
 #define SYS_SM_THREAD_TICK    10
 #include <rtthread.h>
 

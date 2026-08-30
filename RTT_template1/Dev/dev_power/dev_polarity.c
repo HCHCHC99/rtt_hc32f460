@@ -31,6 +31,7 @@ static PolarityWin_t s_nWin;
 static uint8_t s_bInit = 0U;
 static volatile uint8_t s_u8PendingState = 0U;  /* 待打印的跳变状态（ISR 置位，线程清） */
 static volatile uint32_t s_arb_send_fail_count = 0U;
+volatile PolarityState_t g_pol_sim_state = POLARITY_UNKNOWN;   /* 模拟极性（POLARITY_SIM_MODE_EN=1 时生效） */
 
 /* ============ 窗口操作 ============ */
 static uint8_t Polarity_WinFull(const PolarityWin_t *w)
@@ -106,13 +107,19 @@ void Polarity_Init(void)
 
 void Polarity_Scan(void)
 {
-    uint8_t p, n;
     PolarityState_t st;
 
     if (!s_bInit) {
         return;
     }
 
+#if POLARITY_SIM_MODE_EN
+    st = g_pol_sim_state;           /* 模拟：直接取表达式窗口的状态 */
+    if ((st == POLARITY_UNKNOWN) || ((uint8_t)st > (uint8_t)POLARITY_ABNORMAL)) {
+        return;                     /* UNKNOWN/非法值：保持上次状态，不发事件 */
+    }
+#else
+    uint8_t p, n;
     p = rt_pin_read(POWER_DIR_P_PIN) ? 1U : 0U;
     n = rt_pin_read(POWER_DIR_N_PIN) ? 1U : 0U;
 
@@ -123,6 +130,7 @@ void Polarity_Scan(void)
     if (st == POLARITY_UNKNOWN) {
         return;                     /* 未满窗/不稳定：保持上次状态，不发事件 */
     }
+#endif
     if (st != s_state) {            /* 稳定状态跳变沿才发事件（不重复发相同事件） */
         s_state = st;
         s_u8PendingState = (uint8_t)st;   /* 由线程上下文 Polarity_PrintPending 打印 */
