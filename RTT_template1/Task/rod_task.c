@@ -1,26 +1,28 @@
 /**
  * @file    rod_task.c
- * @brief   推杆位置/状态 10ms 周期更新（Actuator_Tick）
- * @note    霍尔占位：Hall_GetDeltaPulses 为弱定义，电机霍尔模块提供后自动覆盖。
+ * @brief   推杆 10ms 纯编排：电机霍尔 Task → 推杆霍尔 Scan → 位置 → 限位校准 → 状态机
+ * @note    本文件不摸 GPIO、不判故障；硬件细节在 dev_hall_rod / dev_hall_motor。
  */
 #include "rod_task.h"
 #include "Dev/dev_mgr/dev_model.h"
 #include "Dev/dev_rod/dev_rod_position.h"
 #include "Dev/dev_rod/dev_rod_state.h"
+#include "Dev/dev_hall_rod/dev_hall_rod.h"
+#include "Dev/dev_hall_motor/dev_hall_motor.h"
 #include "Dev/dev_act/dev_act.h"
-#include "Adp/hc32_drv_gpio.h"
 #include <rtthread.h>
-
-/* 占位：电机霍尔脉冲（每机械转 12 边沿，导程10mm/圈，减速比10 —— 模块后续提供，覆盖此弱定义） */
-RT_WEAK int32_t Hall_GetDeltaPulses(uint8_t axis_id)
-{
-    (void)axis_id;
-    return 0;
-}
 
 static void Actuator_Tick(uint32_t tick)
 {
-    for (uint8_t i = 0U; i < MAX_AXIS_NUM; i++) {
+    uint8_t i;
+
+    /* 1. 电机霍尔：测速/堵转观测/霍尔状态/增量累积（对应参考 motor_hall_update） */
+    MotorHall_Task();
+
+    /* 2. 推杆霍尔：消抖 + 双高故障沿检测（故障沿内部发 EVT_SYS_ROD_LIMIT_FAULT） */
+    RodHall_Scan();
+
+    for (i = 0U; i < MAX_AXIS_NUM; i++) {
         Axis_t *axis = &mySystem.axis[i];
         int32_t delta;
         ArbData_t arb;
@@ -30,28 +32,19 @@ static void Actuator_Tick(uint32_t tick)
             continue;   /* 未配置轴跳过 */
         }
 
-        /* 1. 霍尔脉冲增量（占位 0） -> 位置更新 */
-        delta = Hall_GetDeltaPulses(i);
+        /* 3. 位置积分（带符号增量，读清） */
+        delta = MotorHall_GetDeltaPulses(i);
         RodPosition_Update(&axis->position, delta);
 
-        /* 2. 读限位霍尔电平（高=触发；上 PB2 / 下 PB10） */
-        axis->state.max_limit_switch = (Hc32_Gpio_Read(ROD_MAX_LIMIT_PORT, ROD_MAX_LIMIT_PIN) != 0U);
-        axis->state.min_limit_switch = (Hc32_Gpio_Read(ROD_MIN_LIMIT_PORT, ROD_MIN_LIMIT_PIN) != 0U);
-
-        /* 3. 限位注入位置模块（自动校准） */
-        RodPosition_OnMaxLimit(&axis->position, axis->state.max_limit_switch);
-        RodPosition_OnMinLimit(&axis->position, axis->state.min_limit_switch);
-
-        /* 4. 上下霍尔双高 = 传感器异常（触发系统 Emergency + 霍尔故障置位） */
-        RodState_SetSensorFault(&axis->state,
-                                (axis->state.max_limit_switch && axis->state.min_limit_switch));
+        /* 4. 限位注入位置模块（自动校准；稳态来自推杆霍尔消抖） */
+        RodPosition_OnMinLimit(&axis->position, RodHall_IsAtMin());
+        RodPosition_OnMaxLimit(&axis->position, RodHall_IsAtMax());
 
         /* 5. 方向指令（仲裁；禁用/读取失败一律视为停止）+ 状态更新 */
         if ((Arb_GetData(i, &arb) == RT_EOK) && (arb.enable != 0U)) {
             if (arb.active_dir == DIR_FWD) {
                 dir = ROD_DIR_FWD;
-            }
-            else if (arb.active_dir == DIR_REV) {
+            } else if (arb.active_dir == DIR_REV) {
                 dir = ROD_DIR_REV;
             }
         }

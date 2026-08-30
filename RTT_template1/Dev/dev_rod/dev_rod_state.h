@@ -43,24 +43,14 @@ typedef enum {
     ROD_EVT_SENSOR_FAULT,    /* 上下霍尔双高异常 */
 } RodEvent_t;
 
-/* 限位引脚（上限 PB2 / 下限 PB10，高电平=触发） */
-#define ROD_MAX_LIMIT_PORT  (GPIO_PORT_B)
-#define ROD_MAX_LIMIT_PIN   (GPIO_PIN_02)
-#define ROD_MIN_LIMIT_PORT  (GPIO_PORT_B)
-#define ROD_MIN_LIMIT_PIN   (GPIO_PIN_10)
-
 /* 推杆状态模块上下文（状态机实例用 Axis_t.sm_act） */
 typedef struct {
     uint8_t              axis_id;         /* 轴序号（日志用） */
     const RodPosition_t *position;      /* 只读位置引用 */
     RodDirection_t       direction;     /* 当前方向指令（来自仲裁） */
-    bool                 max_limit_switch;
-    bool                 min_limit_switch;
-    bool                 sensor_fault;  /* 上下霍尔双高异常 */
     uint32_t             fault_code;
     uint32_t             move_start_tick;
     uint32_t             move_timeout_ms;     /* 运动超时 ms（5000，0=禁用） */
-    float                min_velocity_thresh; /* 堵转最小速度 mm/s（0.5，霍尔接入后启用） */
     bool                 limit_ext_sent;      /* 防重复发送 */
     bool                 limit_ret_sent;
     uint32_t             extend_count;
@@ -71,7 +61,6 @@ typedef struct {
 
 void RodState_Init(StateMachine_t *sm, RodStateCtx_t *ctx, uint8_t axis_id, const RodPosition_t *pos);
 void RodState_Update(StateMachine_t *sm, RodStateCtx_t *ctx, RodDirection_t dir, uint32_t tick);
-void RodState_SetSensorFault(RodStateCtx_t *ctx, bool fault);
 RodState_t RodState_Get(StateMachine_t *sm);
 
 #endif /* __DEV_ROD_STATE_H__ */

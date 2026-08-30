@@ -18,6 +18,7 @@ struct us_timer_ops {
     uint64_t (*get_timestamp)(void);     /* 全局累计 us */
     uint32_t (*get_counter)(void);       /* 原始计数值 */
     uint32_t (*delta_to_us)(uint32_t cnt); /* 计数差 -> us */
+    uint32_t (*get_delta)(void);         /* 距上次调用的计数差（底层维护 last 计数，处理回绕） */
 };
 
 /* 绑定底层实现（如 hc_us_timer_ops） */
@@ -30,5 +31,6 @@ void     UsTimer_UpdateTimestamp(void);
 uint64_t UsTimer_GetTimestampUs(void);
 uint32_t UsTimer_GetCounter(void);
 uint32_t UsTimer_DeltaToUs(uint32_t cnt);
+uint32_t UsTimer_GetDelta(void);
 
 #endif /* __US_TIMER_H__ */

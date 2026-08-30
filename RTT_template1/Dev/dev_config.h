@@ -15,6 +15,8 @@
 #define DEV_ENABLE_ACT_ARB          1   /* 电机仲裁模块（C 模式：rt_mq + 每轴互斥量 + 仲裁线程） */
 #define DEV_ENABLE_ARB_SELFTEST     0   /* 仲裁台架自测线程（已关闭：输入源由用户经模拟极性自行驱动） */
 #define DEV_ENABLE_PWM              1   /* 电机 PWM 输出设备（仲裁输出接缝：fwd/rev/stop ops） */
+#define DEV_ENABLE_HALL_ROD         1   /* 推杆霍尔设备（限位消抖 + 双高故障沿） */
+#define DEV_ENABLE_HALL_MOTOR       1   /* 电机霍尔设备（EXTI 计数 + 测速，观测用） */
 
 /* ============ 设备优先级常量（数字越小优先级越高，与 dev_registry 语义一致） ============ */
 #define DEV_PRIO_HIGH               2

@@ -172,6 +172,7 @@ static void hc_us_timer_update_ts(void)       { Timer6_Timebase_UpdateTimestamp(
 static uint64_t hc_us_timer_get_ts(void)      { return Timer6_Timebase_GetTimestamp(); }
 static uint32_t hc_us_timer_get_counter(void) { return Timer6_Timebase_GetCounter(); }
 static uint32_t hc_us_timer_delta_to_us(uint32_t cnt) { return Timer6_Timebase_DeltaToUs(cnt); }
+static uint32_t hc_us_timer_get_delta(void)   { return Timer6_Timebase_GetDelta(); }
 
 const struct us_timer_ops hc_us_timer_ops = {
     hc_us_timer_init,
@@ -181,6 +182,7 @@ const struct us_timer_ops hc_us_timer_ops = {
     hc_us_timer_get_ts,
     hc_us_timer_get_counter,
     hc_us_timer_delta_to_us,
+    hc_us_timer_get_delta,
 };
 
 /* ==================== 1ms 检测心跳（TMR0_2 CH_A） ==================== */

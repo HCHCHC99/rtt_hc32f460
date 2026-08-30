@@ -15,6 +15,8 @@
 #include "Dev/dev_monitor/dev_monitor.h"
 #include "Dev/dev_act/dev_act.h"
 #include "Dev/dev_pwm/dev_pwm.h"
+#include "Dev/dev_hall_rod/dev_hall_rod.h"
+#include "Dev/dev_hall_motor/dev_hall_motor.h"
 #include <rtthread.h>
 
 
@@ -129,6 +131,18 @@ void Dev_RegisterAll(void)
     static const SysModule_t s_pwm_module =
         SYS_MODULE_REGISTER(pwm, Dev_Pwm_Init, RT_NULL, DEV_PRIO_MID, 0);
     Dev_Registry_Add(&s_pwm_module);
+#endif
+#if DEV_ENABLE_HALL_ROD
+    /* 推杆霍尔：init 由 registry 统一调（IDLE 入口复位）；Scan 由 rod_task 10ms 调 */
+    static const SysModule_t s_hall_rod_module =
+        SYS_MODULE_REGISTER(hall_rod, RodHall_Init, RT_NULL, DEV_PRIO_MID, 0);
+    Dev_Registry_Add(&s_hall_rod_module);
+#endif
+#if DEV_ENABLE_HALL_MOTOR
+    /* 电机霍尔：init 首次注册 EXTI（IDLE 重入仅复位业务态）；Task 由 rod_task 10ms 调 */
+    static const SysModule_t s_hall_motor_module =
+        SYS_MODULE_REGISTER(hall_mot, MotorHall_Init, RT_NULL, DEV_PRIO_MID, 0);
+    Dev_Registry_Add(&s_hall_motor_module);
 #endif
 
 } 

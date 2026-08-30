@@ -19,6 +19,8 @@
 #define TH_DIAG_PRINT_EN        0   /* 线程调度诊断：全线程 stat/prio 转储 */
 #define LED_PRINT_EN            0   /* LED：翻转打印（1s 一次，带 us 时间戳） */
 #define ROD_PRINT_EN            1   /* 推杆：状态/限位/霍尔故障 */
+#define HALL_ROD_PRINT_EN       1   /* 推杆霍尔：限位/双高故障 */
+#define HALL_MOTOR_PRINT_EN     1   /* 电机霍尔：初始化/周期观测 */
 #define MONITOR_PRINT_EN        1   /* 采样监视（1s 周期打印） */
 #define QUEUE_INIT_PRINT_EN     0   /* 队列初始化（示例，默认关闭） */
 #define MONITOR_SYS_PRINT_EN    0   /* 系统1s打印 */
@@ -77,6 +79,18 @@
 #define ROD_PRINT(fmt, ...)         MAIN_D("[ROD] " fmt, ##__VA_ARGS__)
 #else
 #define ROD_PRINT(fmt, ...)         ((void)0)
+#endif
+
+#if HALL_ROD_PRINT_EN
+#define HALL_ROD_PRINT(fmt, ...)    MAIN_D("[HALL_R] " fmt, ##__VA_ARGS__)
+#else
+#define HALL_ROD_PRINT(fmt, ...)    ((void)0)
+#endif
+
+#if HALL_MOTOR_PRINT_EN
+#define HALL_MOTOR_PRINT(fmt, ...)  MAIN_D("[HALL_M] " fmt, ##__VA_ARGS__)
+#else
+#define HALL_MOTOR_PRINT(fmt, ...)  ((void)0)
 #endif
 
 #if QUEUE_INIT_PRINT_EN

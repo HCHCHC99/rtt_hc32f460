@@ -5,8 +5,8 @@
  */
 #include "dev_rod_state.h"
 #include "Dev/dev_mgr/dev_model.h"       /* mySystem / Act_Event_Send */
-#include "Dev/dev_mgr/dev_state.h"        /* Sys_Event_Send */
 #include "Dev/dev_mgr/dev_event_def.h"
+#include "Dev/dev_hall_rod/dev_hall_rod.h" /* 限位/故障稳态源（推杆霍尔设备） */
 #include "applications/rtt_manager.h"
 #include <rtthread.h>
 
@@ -69,13 +69,9 @@ void RodState_Init(StateMachine_t *sm, RodStateCtx_t *ctx, uint8_t axis_id, cons
     ctx->axis_id           = axis_id;
     ctx->position          = pos;
     ctx->direction         = ROD_DIR_STOP;
-    ctx->max_limit_switch  = false;
-    ctx->min_limit_switch  = false;
-    ctx->sensor_fault      = false;
     ctx->fault_code        = 0U;
     ctx->move_start_tick   = 0U;
     ctx->move_timeout_ms   = 5000U;
-    ctx->min_velocity_thresh = 0.5f;
     ctx->limit_ext_sent    = false;
     ctx->limit_ret_sent    = false;
     ctx->extend_count      = 0U;
@@ -84,16 +80,14 @@ void RodState_Init(StateMachine_t *sm, RodStateCtx_t *ctx, uint8_t axis_id, cons
     ctx->limit_reach_count = 0U;
 }
 
-/* 事件合成：优先级 传感器异常 > 限位 > 超时 > 方向指令 */
+/* 事件合成：优先级 传感器异常 > 限位 > 超时 > 方向指令（限位/故障源 = 推杆霍尔稳态） */
 static RodEvent_t RodState_SynthesizeEvent(const RodStateCtx_t *ctx, RodState_t st,
                                            RodDirection_t dir, uint32_t tick)
 {
-    bool at_max = ctx->max_limit_switch ||
-                  (ctx->position->in_calib_zone_max && dir == ROD_DIR_FWD);
-    bool at_min = ctx->min_limit_switch ||
-                  (ctx->position->in_calib_zone_min && dir == ROD_DIR_REV);
+    bool at_max = RodHall_IsAtMax();
+    bool at_min = RodHall_IsAtMin();
 
-    if (ctx->sensor_fault) {
+    if (RodHall_IsFault()) {
         return ROD_EVT_SENSOR_FAULT;
     }
     if (at_max && (st == ROD_STATE_UNKNOWN || st == ROD_STATE_STOPPED ||
@@ -170,16 +164,6 @@ void RodState_Update(StateMachine_t *sm, RodStateCtx_t *ctx, RodDirection_t dir,
     if (cur != prev) {
         ROD_PRINT("rod%u state=%s", (unsigned)ctx->axis_id, s_rod_state_name[cur]);
     }
-}
-
-void RodState_SetSensorFault(RodStateCtx_t *ctx, bool fault)
-{
-    if (fault && !ctx->sensor_fault) {
-        /* 上升沿：触发系统急停（推杆上下霍尔故障），由 sys_sm 置 fault_bits + Emergency */
-        Sys_Event_Send(EVT_SYS_ROD_LIMIT_FAULT);
-        ROD_PRINT("rod sensor fault (both limit high)");
-    }
-    ctx->sensor_fault = fault;
 }
 
 RodState_t RodState_Get(StateMachine_t *sm)

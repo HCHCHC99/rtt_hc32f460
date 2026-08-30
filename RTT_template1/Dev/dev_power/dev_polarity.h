@@ -10,8 +10,8 @@
 #include <stdint.h>
 
 /* 引脚配置（统一放头文件） */
-#define POWER_DIR_P_PIN     GET_PIN(B, 13)   /* 正极线检测 */
-#define POWER_DIR_N_PIN     GET_PIN(B, 12)   /* 负极线检测 */
+#define POWER_DIR_P_PIN     GET_PIN(C, 14)   /* 正极线检测 */
+#define POWER_DIR_N_PIN     GET_PIN(C, 15)   /* 负极线检测 */
 
 /* 默认配置宏（统一放头文件） */
 #define POLARITY_WIN_SIZE   (5U)             /* 双窗口各 5 点：di_task 2ms 采样 => 10ms 消抖 */

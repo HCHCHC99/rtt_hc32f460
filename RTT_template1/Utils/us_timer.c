@@ -64,5 +64,13 @@ uint32_t UsTimer_DeltaToUs(uint32_t cnt)
     return 0;
 }
 
+uint32_t UsTimer_GetDelta(void)
+{
+    if (s_ops != NULL && s_ops->get_delta != NULL) {
+        return s_ops->get_delta();
+    }
+    return 0;
+}
+
 /* EOF */
 
