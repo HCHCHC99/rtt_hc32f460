@@ -64,11 +64,11 @@ void Monitor_Task(void)
     (void)Dev_Adc_GetRaw(0, &raw_v);
     (void)Dev_Adc_GetRaw(1, &raw_i);
     (void)Dev_Adc_GetMean(0, &mean_v);
-    (void)Dev_Adc_GetMean(1, &mean_i);
+    (void)Dev_Adc_GetMean(1, &mean_i);   /* CH5 ADC 层只出电压 V（mA 换算在 dev_cur_sensor，见 cur_ma） */
     g_monitor.adc_raw_v   = raw_v;
     g_monitor.adc_raw_i   = raw_i;
-    g_monitor.adc_mean_v  = mean_v;
-    g_monitor.adc_mean_i  = mean_i;
+    g_monitor.adc_mean_v  = mean_v;       /* V */
+    g_monitor.adc_mean_i  = mean_i;       /* 电流通道 ADC 电压 V（非 mA；mA 见 cur_ma） */
 
     /* 母线电压 */
     st = 0U;
@@ -141,10 +141,10 @@ void Monitor_DumpSys(void)
 
 void Monitor_DumpDev(void)
 {
-    MONITOR_PRINT("adc raw=%u/%u mean=%lummV/%lumA",
+    MONITOR_PRINT("adc raw=%u/%u mean=%lummV/%lummV",
                   g_monitor.adc_raw_v, g_monitor.adc_raw_i,
                   (unsigned long)(g_monitor.adc_mean_v * 1000.0f),
-                  (unsigned long)g_monitor.adc_mean_i);
+                  (unsigned long)(g_monitor.adc_mean_i * 1000.0f));
     MONITOR_PRINT("volt=%lummV %s cur=%lumA %s over_ms=%ums pol=%s",
                   (unsigned long)(g_monitor.bus_volt * 1000.0f),
                   s_volt_st_name[g_monitor.volt_status],

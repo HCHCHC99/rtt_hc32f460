@@ -25,7 +25,7 @@ typedef struct {
 
     /* ADC */
     uint16_t        adc_raw_v, adc_raw_i;   /* 最新原始 AD */
-    float           adc_mean_v, adc_mean_i; /* 10ms 滑动均值 */
+    float           adc_mean_v, adc_mean_i; /* 10ms 滑动均值，均单位 V（adc_mean_i 为电流通道电压，mA 见 cur_ma） */
 
     /* 母线电压 */
     float           bus_volt;         /* 滤波+偏置后 V */

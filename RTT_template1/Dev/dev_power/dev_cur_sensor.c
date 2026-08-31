@@ -1,7 +1,9 @@
 /**
  * @file    dev_cur_sensor.c
- * @brief   电流传感器设备：读 10ms 滑动均值→时间窗口过流（1ms ISR 检测）
- * @note    电流换算在 ADC 驱动（已取绝对值）；本设备 1ms ISR 消费均值并判定；
+ * @brief   电流传感器设备：读 ADC 10ms 滑动电压均值→差分放大器换算→时间窗口过流（1ms ISR 检测）
+ * @note    电流换算在本模块（ADC 层 CH5 只出电压 V）：
+ *          差分放大器 0V 零点 100mV/A → mA = (V - 0) × 10000；
+ *          换传感器只改本模块宏（CUR_SENSOR_ZERO_V / CUR_SENSITIVITY_MA_PER_V），不动 ADC 层。
  *          过流事件 ISR 直发 rt_event（ISR 安全），打印在 sys_sm 线程。
  */
 #include "dev_cur_sensor.h"
@@ -38,9 +40,11 @@ void CurrentSensor_Isr1ms(void)
     float fCurrMa = 0.0f;
 
 #if CUR_SIM_MODE_EN
-    fCurrMa = (float)g_cur_sim_ma;         /* 模拟：直接赋值（ADC 读取一并旁路） */
+    fCurrMa = (float)g_cur_sim_ma;         /* 模拟：直接赋值（ADC 读取与换算一并旁路） */
 #else
-    (void)Dev_Adc_GetMean(1U, &fCurrMa);   /* 10ms 滑动均值，单位 mA（已取绝对值） */
+    float fVoltV = 0.0f;
+    (void)Dev_Adc_GetMean(1U, &fVoltV);     /* 10ms 滑动均值，单位 V（ADC 层仅出电压，不换算） */
+    fCurrMa = (fVoltV - CUR_SENSOR_ZERO_V) * CUR_SENSITIVITY_MA_PER_V;  /* 差分放大器 V→mA */
 #endif
     s_fCurrMa = fCurrMa;
 

@@ -16,7 +16,7 @@ static const struct dev_adc_ops *g_adc_ops = NULL;
 /* 通道配置表（芯片无关：只含换算；端口/引脚在 HC32 实现层映射） */
 static const dev_adc_ch_cfg_t s_astcChTable[] = {
     { 6,      16.0f,      0.0f,      false },   /* CH6 电压：PA6，150k:10k 分压，gain=16，满量程 52.8V */
-    { 5,   7575.7576f, -12500.0f,    true  },   /* CH5 电流：VOUT=1650+IP*132(mV) -> mA */
+    { 5,   1.0f,        0.0f,        false },   /* CH5 电流通道：ADC 层仅出电压 V，差分放大器 V→mA 换算在 dev_cur_sensor */
 };
 
 

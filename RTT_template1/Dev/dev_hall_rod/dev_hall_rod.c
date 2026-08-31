@@ -74,9 +74,10 @@ void RodHall_Scan(void)
 
     RodHall_WinPush(&s_maxWin, mx);
     RodHall_WinPush(&s_minWin, mn);
-    RodHall_WinPush(&s_ftWin, (uint8_t)(mx & mn));
+    // 修改点：双低故障 -> 两个都低时窗口推1
+    RodHall_WinPush(&s_ftWin, (uint8_t)(!(mx | mn)));
 
-    /* 窗口全 1 -> 稳定触发；全 0 -> 稳定释放；未满/不稳定 -> 保持上次稳定态 */
+    /* 窗口全 1 -> 稳定触发；全 0 -> 稳定释放 */
     if (RodHall_WinAllOne(&s_maxWin) != 0U) {
         s_atMax = true;
     } else if (RodHall_WinAllZero(&s_maxWin) != 0U) {
@@ -88,11 +89,11 @@ void RodHall_Scan(void)
         s_atMin = false;
     }
 
-    /* 双高故障：消抖后上升沿发系统事件（EMERGENCY），只发跳变沿 */
+    /* 双低故障：消抖后上升沿发系统事件（EMERGENCY），只发跳变沿 */
     fault_now = (RodHall_WinAllOne(&s_ftWin) != 0U);
     if (fault_now && !s_fault) {
         Sys_Event_Send(EVT_SYS_ROD_LIMIT_FAULT);
-        HALL_ROD_PRINT("rod hall fault (both high)");
+        HALL_ROD_PRINT("rod hall fault (both low)");
     }
     s_fault = fault_now;
 

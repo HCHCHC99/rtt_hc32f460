@@ -86,9 +86,9 @@ static void monitor_sample_1s(void)
     rt_uint32_t sm_evt = 0U;
     char sm_evt_name[128];
     float v_avg = 0.0f, c_avg = 0.0f;
-    float v_lst = 0.0f, c_lst = 0.0f;
+    float v_lst = 0.0f, i_v_lst = 0.0f;   /* ADC 最新：电压 V（分压换算）/ 电流通道电压 V（无 mA 换算） */
     uint32_t v_avg_mv = 0U, v_lst_mv = 0U;
-    uint16_t c_avg_i = 0U, c_avg_d = 0U, c_lst_i = 0U, c_lst_d = 0U;
+    uint16_t c_avg_i = 0U, c_avg_d = 0U, i_v_lst_i = 0U, i_v_lst_d = 0U;
     uint32_t t_us = 0U;
 
     UsTimer_UpdateTimestamp();
@@ -127,19 +127,19 @@ static void monitor_sample_1s(void)
     Dev_Adc_GetRaw(1, &raw_i);
     BusVoltage_GetInfo(&v_avg, RT_NULL);
     CurrentSensor_GetInfo(&c_avg, RT_NULL);
-    Dev_Adc_GetLatest(&v_lst, &c_lst);
+    Dev_Adc_GetLatest(&v_lst, &i_v_lst);  /* 电流通道返回 ADC 电压 V；mA 权威源在 dev_cur_sensor（c_avg） */
 
     v_avg_mv = (uint32_t)(v_avg * 1000.0f);
     v_lst_mv  = (uint32_t)(v_lst * 1000.0f);
     c_avg_i = (uint16_t)c_avg;
     c_avg_d = (uint16_t)((c_avg - (float)c_avg_i) * 10.0f);
-    c_lst_i = (uint16_t)c_lst;
-    c_lst_d = (uint16_t)((c_lst - (float)c_lst_i) * 10.0f);
+    i_v_lst_i = (uint16_t)i_v_lst;
+    i_v_lst_d = (uint16_t)((i_v_lst - (float)i_v_lst_i) * 100.0f);
 
-    /* ADC 层：原始 AD + 最近一次换算（无均值、无偏置） */
-    MONITOR_PRINT("adc: t=%uus AD=%u/%u cur=%u.%01umA vol=%umV",
-                  t_us, raw_v, raw_i, c_lst_i, c_lst_d, v_lst_mv);
-    /* 设备层：电流传感器均值 + 母线电压均值（电压已含 VOL_OFFSET 偏置） */
+    /* ADC 层：原始 AD + 最新工程值（电压=分压换算 V；电流通道=ADC 电压 V，差分放大器 mA 换算在 dev_cur_sensor） */
+    MONITOR_PRINT("adc: t=%uus AD=%u/%u cur_v=%u.%02uV vol=%umV",
+                  t_us, raw_v, raw_i, i_v_lst_i, i_v_lst_d, v_lst_mv);
+    /* 设备层：电流传感器（差分放大器换算 mA）+ 母线电压均值（电压已含 VOL_OFFSET 偏置） */
     MONITOR_PRINT("dev: t=%uus cur=%u.%01umA vol=%umV",
                   t_us, c_avg_i, c_avg_d, v_avg_mv);
 

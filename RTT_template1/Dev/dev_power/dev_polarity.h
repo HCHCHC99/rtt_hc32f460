@@ -18,7 +18,7 @@
 
 /* 仲裁命令映射（当前唯一实体电机轴；axis 1 预留） */
 #define POLARITY_ARB_AXIS_ID        (0U)
-#define POLARITY_ARB_RUN_DUTY_PCT   (85U)   /* 后续按电机负载和温升调整 */
+#define POLARITY_ARB_RUN_DUTY_PCT   (98U)   /* 后续按电机负载和温升调整 */
 
 /* 电源极性状态 */
 typedef enum {
@@ -32,7 +32,7 @@ typedef enum {
 /* ===================== 模拟模式 ===================== */
 /* 1=模拟：Polarity_Scan 不读 GPIO/不做窗口消抖，改用 g_pol_sim_state 直接判定
    （表达式窗口实时可改：0=UNKNOWN 保持上次 1=UNPOWERED 2=FWD 3=REV 4=ABNORMAL） */
-#define POLARITY_SIM_MODE_EN    (0)
+#define POLARITY_SIM_MODE_EN    (1)
 extern volatile PolarityState_t g_pol_sim_state;   /* 模拟极性状态（含义见 PolarityState_t；UNKNOWN=保持不发事件） */
 
 void Polarity_Init(void);              /* 注册表 init：复位窗口与状态 */
