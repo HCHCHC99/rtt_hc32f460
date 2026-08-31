@@ -1,110 +1,207 @@
 /**
  * @file    dev_pwm.c
- * @brief   电机 PWM 输出设备实现：PHU/PHV 同比较值 + 反相极性 → 严格互补输出
- * @note    严格互补原理：两通道共用同一比较值 CMP，但极性相反——
- *          PHU 高电平区间 [0,CMP) ⟺ PHV 低电平区间 [0,CMP)，任意时刻严格互反，无双高/双低。
- *          停止用硬件强制极性（FORCE_LOW）而非比较值，无毛刺。
+ * @brief   电机 PWM 输出设备实现：TMR4_3 双组 H 桥 + 缓启动状态机（专用调速线程）
+ * @note    架构（命令接缝 + 调速线程，支持 duty_pct 调速）：
+ *          - act 线程仲裁决策 → ops(fwd/rev/stop) 只写目标(方向+占空比)+释放信号量；
+ *          - pwm 调速线程（TASK_PRIO_PWM，10ms tick）推进 ramp：
+ *            U/V 两组占空比各自线性逼近目标（低有效：低电平占比 = 占空比%）；
+ *          - 极性仅在 U=V=50%（端压差=0、电流连续）时刻切换：
+ *            启动 = STOP 态切 run 极性后 ramp；停止 = ramp 回 50/50 后切 stop 极性；
+ *          - 换向/调速不切极性：U/V 目标互换，ramp 自然穿过 50/50（无电流突变）；
+ *          - 急停 EStop：跳过 ramp 立即混合极性 50/50（参考 dev_motor 停止行为，
+ *            互补 50% = 动态刹车），并撤销未决命令防止线程自启动。
  */
 #include "dev_pwm.h"
 #include "Adp/hc32_drv_pwm.h"
 #include "applications/rtt_manager.h"
 #include "Dev/dev_act/dev_act.h"
+#include <rtthread.h>
+#include <rthw.h>   /* rt_hw_interrupt_disable / enable */
 
-/* 电机状态：0=停止 1=正转(伸出) 2=反转(缩回) */
-static uint8_t s_motor_mode = 0U;
+#if !PWM_DRV_USE_TMR4
+#error "dev_pwm 现行为 TMR4_3 版本；如需切回旧 TMRA 实现请从版本历史恢复本文件"
+#endif
 
-typedef struct {
-    uint8_t  port;
-    uint16_t pins;
-    CM_TMRA_TypeDef *tmra;
-    uint32_t ch;
-    float    duty;             /* 当前占空比（观测用） */
-} DevPwmCh_t;
+/* ===================== 命令接缝（act/任意上下文写 → pwm 线程读） ===================== */
+#define CMD_DIR_STOP            (0U)
+#define CMD_DIR_FWD             (1U)
+#define CMD_DIR_REV             (2U)
 
-static DevPwmCh_t s_phu;
-static DevPwmCh_t s_phv;
+static volatile uint8_t s_cmd_dir;      /* 目标方向：0=停止 1=fwd 2=rev */
+static volatile uint8_t s_cmd_duty;     /* 目标有效占空比%（0=用默认） */
+static struct rt_semaphore s_cmd_sem;
+
+/* 写命令（关中断保证 dir/duty 成对可见），随后开中断再释放信号量 */
+static void Cmd_Post(uint8_t dir, uint8_t duty_pct)
+{
+    rt_base_t level = rt_hw_interrupt_disable();
+    s_cmd_dir = dir;
+    s_cmd_duty = duty_pct;
+    rt_hw_interrupt_enable(level);
+    (void)rt_sem_release(&s_cmd_sem);
+}
+
+/* 读命令快照（关中断保证 dir/duty 成对读取） */
+static void Cmd_Fetch(uint8_t *dir, uint8_t *duty)
+{
+    rt_base_t level = rt_hw_interrupt_disable();
+    *dir = s_cmd_dir;
+    *duty = s_cmd_duty;
+    rt_hw_interrupt_enable(level);
+}
+
+/* ===================== 调速线程私有状态 ===================== */
+typedef enum {
+    PWM_ST_STOP = 0,    /* 停止态：U=V=50 + 混合极性（H/L 互补，端压差≈0） */
+    PWM_ST_RAMP,        /* 缓启动/缓停/换向中：占空比逐步逼近目标 */
+    PWM_ST_RUN,         /* 运行态：已到目标占空比 */
+} PwmState_t;
+
+static PwmState_t s_st = PWM_ST_STOP;
+static uint8_t s_run_dir;           /* 当前运行方向（RAMP/RUN 态有效） */
+static uint8_t s_u_cur = 50U;       /* 当前 U 组占空比%（低有效） */
+static uint8_t s_v_cur = 50U;       /* 当前 V 组占空比%（低有效） */
+static uint8_t s_u_tgt = 50U;       /* 目标 U 组占空比% */
+static uint8_t s_v_tgt = 50U;       /* 目标 V 组占空比% */
+static uint8_t s_u_applied = 0xFFU; /* 已写入硬件的占空比（diff 才写 OCCR） */
+static uint8_t s_v_applied = 0xFFU;
+static rt_tick_t s_last_tick;
 static uint8_t s_inited = 0U;
 
-/* 严格互补驱动：两通道共用同一比较值 CMP（极性相反）
-   duty_pct = PHU 高电平时间占比（2=正转伸出 98=反转缩回） */
-static void PwmMotor_ApplyDuty(uint8_t duty_pct)
+/* 单字节步进：向 tgt 逼近一步（下坡防下溢） */
+static uint8_t RampStep8(uint8_t cur, uint8_t tgt, uint8_t step)
 {
-    uint32_t cmp = ((uint32_t)(PWM_PERIOD_DFT + 1U) * duty_pct) / 100U;
-    if (cmp > 0U) {
-        cmp--;                       /* 官方公式：CmpVal = ((PeriodVal+1)*Duty) - 1 */
+    if (cur < tgt) {
+        cur += step;
+        if (cur > tgt) {
+            cur = tgt;
+        }
+    } else if (cur > tgt) {
+        cur = (cur > (uint8_t)(tgt + step)) ? (uint8_t)(cur - step) : tgt;
     }
-    PwmHw_SetCompareValue(PWM_PHU_TMRA, PWM_PHU_CH, cmp);
-    PwmHw_SetCompareValue(PWM_PHV_TMRA, PWM_PHV_CH, cmp);
+    return cur;
 }
 
-/* 停止：硬件强制双低（FORCE 极性，无毛刺；解除需 RunFwd/RunRev） */
-static void PwmMotor_ForceStop(void)
+/* 占空比写硬件（低有效：低电平占比 = duty%；diff 才写 OCCR，peak 缓冲装载） */
+static void ApplyDuty(uint8_t *applied, uint8_t grp, uint8_t duty)
 {
-    PwmHw_SetForcePolarity(PWM_PHU_TMRA, PWM_PHU_CH, TMRA_PWM_FORCE_LOW);
-    PwmHw_SetForcePolarity(PWM_PHV_TMRA, PWM_PHV_CH, TMRA_PWM_FORCE_LOW);
-}
-
-/* 解除硬件强制（恢复正常比较输出） */
-static void PwmMotor_Release(void)
-{
-    PwmHw_SetForcePolarity(PWM_PHU_TMRA, PWM_PHU_CH, TMRA_PWM_FORCE_INVD);
-    PwmHw_SetForcePolarity(PWM_PHV_TMRA, PWM_PHV_CH, TMRA_PWM_FORCE_INVD);
-}
-
-int Dev_PwmMotor_RunFwd(void)
-{
-    if ((s_inited == 0U) || (s_motor_mode == 1U)) {
-        return (s_inited == 0U) ? -1 : 0;
+    if (*applied != duty) {
+        PwmHw4_SetCompare(grp, PwmHw4_DutyToCompare(duty));
+        *applied = duty;
     }
-    PwmMotor_Release();
-    PwmMotor_ApplyDuty(PWM_RUN_DUTY_PCT);
-    s_motor_mode = 1U;
-    return 0;
 }
 
-int Dev_PwmMotor_RunRev(void)
+/* 10ms tick：读目标 → 状态机推进 → 写硬件 */
+static void Pwm_RampTick(void)
 {
-    if ((s_inited == 0U) || (s_motor_mode == 2U)) {
-        return (s_motor_mode == 2U) ? 0 : -1;
+    uint8_t dir, duty, step;
+
+    Cmd_Fetch(&dir, &duty);
+
+    /* 目标换算（对齐参考 dev_motor：fwd V=eff/U=100-eff，rev 互换，停止 U=V=50） */
+    if (dir == CMD_DIR_STOP) {
+        s_u_tgt = 50U;
+        s_v_tgt = 50U;
+    } else {
+        uint8_t eff = (duty == 0U) ? (uint8_t)PWM_RUN_DUTY_PCT : duty;
+        if (eff < PWM_DUTY_MIN) {
+            eff = PWM_DUTY_MIN;
+        }
+        if (eff > PWM_DUTY_MAX) {
+            eff = PWM_DUTY_MAX;
+        }
+        if (dir == CMD_DIR_FWD) {
+            s_v_tgt = eff;
+            s_u_tgt = (uint8_t)(100U - eff);
+        } else {
+            s_u_tgt = eff;
+            s_v_tgt = (uint8_t)(100U - eff);
+        }
     }
-    PwmMotor_Release();
-    PwmMotor_ApplyDuty(100U - PWM_RUN_DUTY_PCT);
-    s_motor_mode = 2U;
-    return 0;
+
+    if (s_st == PWM_ST_STOP) {
+        if (dir == CMD_DIR_STOP) {
+            return;     /* 停止态无命令：硬件保持混合极性 50/50 */
+        }
+        /* 启动：U=V=50（端压差=0）时刻切 run 极性 → 电流连续 */
+        s_run_dir = dir;
+        s_u_cur = 50U;
+        s_v_cur = 50U;
+        s_u_applied = 0xFFU;
+        s_v_applied = 0xFFU;
+        PwmHw4_SetRunPolarity(PWM_GRP_U);
+        PwmHw4_SetRunPolarity(PWM_GRP_V);
+        PWM_PRINT("start dir=%u eff=%u (run polarity @50/50)",
+                  (unsigned)dir, (unsigned)((duty == 0U) ? PWM_RUN_DUTY_PCT : duty));
+        s_st = PWM_ST_RAMP;
+    }
+
+    /* ramp 步进：停止用快步长，运行/换向用正常步长 */
+    step = (dir == CMD_DIR_STOP) ? (uint8_t)PWM_RAMP_STEP_STOP_PCT
+                                 : (uint8_t)PWM_RAMP_STEP_PCT;
+    s_u_cur = RampStep8(s_u_cur, s_u_tgt, step);
+    s_v_cur = RampStep8(s_v_cur, s_v_tgt, step);
+    ApplyDuty(&s_u_applied, PWM_GRP_U, s_u_cur);
+    ApplyDuty(&s_v_applied, PWM_GRP_V, s_v_cur);
+
+    /* 状态跃迁 */
+    if ((s_u_cur == s_u_tgt) && (s_v_cur == s_v_tgt)) {
+        if (dir == CMD_DIR_STOP) {
+            /* ramp 到 50/50：切混合极性（组内 L 反相 = 互补 50% = 停止态） */
+            PwmHw4_SetStopPolarity(PWM_GRP_U);
+            PwmHw4_SetStopPolarity(PWM_GRP_V);
+            s_st = PWM_ST_STOP;
+            PWM_PRINT("stopped (stop polarity @50/50)");
+        } else {
+            if (s_run_dir != dir) {
+                PWM_PRINT("dir -> %s", (dir == CMD_DIR_FWD) ? "fwd" : "rev");
+                s_run_dir = dir;
+            }
+            s_st = PWM_ST_RUN;
+            PWM_PRINT("run u=%u v=%u", (unsigned)s_u_cur, (unsigned)s_v_cur);
+        }
+    } else {
+        s_st = PWM_ST_RAMP;     /* 逼近中（含换向/调速） */
+        if (dir != CMD_DIR_STOP) {
+            s_run_dir = dir;
+        }
+    }
 }
 
-int Dev_PwmMotor_Stop(void)
+/* 调速线程入口：10ms tick（信号量提前唤醒仅刷新目标，ramp 恒速推进） */
+static void Pwm_ThreadEntry(void *param)
 {
-    if (s_inited == 0U) {
-        return -1;
+    (void)param;
+    while (1) {
+        (void)rt_sem_take(&s_cmd_sem, rt_tick_from_millisecond(PWM_TICK_MS));
+        Task_Set_Beat();
+        /* 命令风暴防护：距上次推进不足一个 tick 则跳过（ramp 恒速，命令下 tick 生效） */
+        rt_tick_t now = rt_tick_get();
+        if ((rt_tick_t)(now - s_last_tick) < rt_tick_from_millisecond(PWM_TICK_MS)) {
+            continue;
+        }
+        s_last_tick = now;
+        Pwm_RampTick();
     }
-    PwmMotor_ForceStop();
-    s_motor_mode = 0U;
-    return 0;
 }
 
-/* 仲裁输出 ops：axis_id 暂不区分（单轴），duty_pct 暂未映射速度（hkb_1 即固定 2/98） */
+/* ===================== 仲裁输出 ops（act 线程上下文调用） ===================== */
 static void Pwm_OpFwd(uint8_t axis_id, uint8_t duty_pct)
 {
     (void)axis_id;
-    (void)duty_pct;
-    ARB_PRINT("motor fwd (PHU=%u PHV=%u)", PWM_RUN_DUTY_PCT, 100U - PWM_RUN_DUTY_PCT);
-    (void)Dev_PwmMotor_RunFwd();
+    Cmd_Post(CMD_DIR_FWD, duty_pct);
 }
 
 static void Pwm_OpRev(uint8_t axis_id, uint8_t duty_pct)
 {
     (void)axis_id;
-    (void)duty_pct;
-    ARB_PRINT("motor rev (PHU=%u PHV=%u)", 100U - PWM_RUN_DUTY_PCT, PWM_RUN_DUTY_PCT);
-    (void)Dev_PwmMotor_RunRev();
+    Cmd_Post(CMD_DIR_REV, duty_pct);
 }
 
 static void Pwm_OpStop(uint8_t axis_id)
 {
     (void)axis_id;
-    ARB_PRINT("motor stop");
-    (void)Dev_PwmMotor_Stop();
+    Cmd_Post(CMD_DIR_STOP, 0U);
 }
 
 static const ArbOutputOps_t s_pwm_out_ops = {
@@ -113,41 +210,86 @@ static const ArbOutputOps_t s_pwm_out_ops = {
     Pwm_OpStop,
 };
 
+/* ===================== 公开 API ===================== */
+int Dev_PwmMotor_RunFwd(void)
+{
+    if (s_inited == 0U) {
+        return -1;
+    }
+    Cmd_Post(CMD_DIR_FWD, 0U);
+    return 0;
+}
+
+int Dev_PwmMotor_RunRev(void)
+{
+    if (s_inited == 0U) {
+        return -1;
+    }
+    Cmd_Post(CMD_DIR_REV, 0U);
+    return 0;
+}
+
+int Dev_PwmMotor_Stop(void)
+{
+    if (s_inited == 0U) {
+        return -1;
+    }
+    Cmd_Post(CMD_DIR_STOP, 0U);
+    return 0;
+}
+
+int Dev_PwmMotor_EStop(void)
+{
+    /* 急停：撤销未决命令 + 立即混合极性 50/50（参考 dev_motor 停止 = 动态刹车）。
+       关中断保证寄存器序列原子；PwmHw4_* 为纯寄存器写，ISR 上下文可调。 */
+    rt_base_t level = rt_hw_interrupt_disable();
+    s_cmd_dir = CMD_DIR_STOP;
+    s_cmd_duty = 0U;
+    PwmHw4_SetCompare(PWM_GRP_U, PwmHw4_DutyToCompare(50U));
+    PwmHw4_SetCompare(PWM_GRP_V, PwmHw4_DutyToCompare(50U));
+    PwmHw4_SetStopPolarity(PWM_GRP_U);
+    PwmHw4_SetStopPolarity(PWM_GRP_V);
+    s_u_cur = 50U;
+    s_v_cur = 50U;
+    s_u_applied = 50U;
+    s_v_applied = 50U;
+    s_st = PWM_ST_STOP;
+    rt_hw_interrupt_enable(level);
+    return 0;
+}
+
+/* ===================== 初始化 ===================== */
 void Dev_Pwm_Init(void)
 {
     if (s_inited != 0U) {
         return;     /* IDLE 重入：跳过（硬件配置不变，无需重复初始化） */
     }
 
-    s_phu.port = PWM_PHU_PORT;
-    s_phu.pins = PWM_PHU_PINS;
-    s_phu.tmra = PWM_PHU_TMRA;
-    s_phu.ch   = PWM_PHU_CH;
-    s_phv.port = PWM_PHV_PORT;
-    s_phv.pins = PWM_PHV_PINS;
-    s_phv.tmra = PWM_PHV_TMRA;
-    s_phv.ch   = PWM_PHV_CH;
+    /* 硬件：TMR4_3 + PB9~PB6(func2) + 上电安全态 = 停止态（混合极性 50/50） */
+    PwmHw4_Init(PWM_FREQ_DFT_HZ);
 
-    /* 上电安全态：占空比 0% = 输出恒低，电机静止 */
-    PwmHw_ChannelInit(s_phu.port, s_phu.pins, s_phu.tmra, s_phu.ch, 0.0f, 1U);
-    PwmHw_ChannelInit(s_phv.port, s_phv.pins, s_phv.tmra, s_phv.ch, 0.0f, 1U);
+    if (rt_sem_init(&s_cmd_sem, "pwmsem", 0, RT_IPC_FLAG_FIFO) != RT_EOK) {
+        PWM_PRINT("sem init failed!");
+        return;
+    }
 
-    /* 绑定仲裁输出：此后 arb 决策直接驱动真实 PWM */
+    /* 调速线程：10ms tick（饿死检测登记 beat=10ms） */
+    if (Task_Set_Create("pwm", Pwm_ThreadEntry, RT_NULL,
+                        TASK_STACK_PWM, TASK_PRIO_PWM, PWM_TICK_MS) == RT_NULL) {
+        PWM_PRINT("thread create failed!");
+        return;     /* 不绑定 ops：arb 调用空 ops 会失败打印，状态可观察 */
+    }
+
+    /* 绑定仲裁输出：此后 arb 决策经 ops 投递目标到调速线程 */
     (void)Arb_BindOutputOps(&s_pwm_out_ops);
-    rt_thread_mdelay(1);
-    /* 时钟诊断：实测计数时钟 vs 50M 假设（示波器频率不符时核对此行） */
-    ARB_PRINT("tmra probe: cnt_clk=%u Hz (period=%u, meas over 100us)",
-              (unsigned)PwmHw_ProbeCountClock(PWM_PHU_TMRA, PWM_PERIOD_DFT),
-              (unsigned)PWM_PERIOD_DFT);
-    rt_thread_mdelay(1);
+
     s_inited = 1U;
-    ARB_PRINT("pwm init phu=PB9/CH4 phv=PB7/CH2 duty=0");
-    rt_thread_mdelay(1);
+    PWM_PRINT("init tmr4_3 U=PB9/PB8 V=PB7/PB6 stop=50/50 mixed");
 }
 
 void Dev_Pwm_Task(void)
 {
-    /* 预留：非阻塞斜坡推进（当前正反转为瞬占空比切换，无 ramp） */
+    /* ramp 已内化到 pwm 调速线程（10ms tick），本函数保留兼容注册表签名 */
 }
 
 /* EOF */

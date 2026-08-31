@@ -1,14 +1,170 @@
 /**
  * @file    hc32_drv_pwm.c
- * @brief   TMRA PWM 硬件适配实现（移植自 hkb_1 adapter_pwm）
- * @note    语义与 hkb_1 一致：u8LowActive=1 时，占空比 = 输出低电平时间百分比
- *          （CompareMatch=LOW / Period=HIGH）；duty 0% = 恒低（电机静止安全态）。
+ * @brief   电机 PWM 硬件适配实现：TMR4_3（现行）/ TMRA4（旧实现保留）
+ * @note    TMR4 语义（对齐参考工程 dev_motor 的运行/停止极性行为）：
+ *          - H/L 均为低有效 OCMR：count=0(无匹配)→低、上计数匹配→高、peak→保持，
+ *            低电平占比 = duty%（比较值 = (period+1)*duty/100）；
+ *            L 通道事件依赖 H 匹配状态联合判定（OCCR_L 恒等于 OCCR_H）；
+ *          - 运行极性 POCR=HOLD/HOLD（组内 H/L 同相，对齐参考"运行全低有效"）；
+ *            停止极性 POCR=HOLD/INVT（L 反相 → 组内互补 50% = 混合极性，端压差≈0）；
+ *          - OCCR/OCMR peak 缓冲装载：运行中改比较值无毛刺；
+ *          - OC 关断 = 恒低（安全态），占空比 0 不经过比较值（规避 cmp=0 事件歧义）。
  */
 #include "hc32_drv_pwm.h"
 #include "hc32_ll.h"
 #include "hc32_ll_pwc.h"
 #include "hc32_ll_fcg.h"
+#include "hc32_ll_clk.h"
 #include <string.h>
+
+#if PWM_DRV_USE_TMR4
+
+/* ============ 本地状态 ============ */
+static uint16_t s_tmr4_period = 0U;
+
+/* 组 → OC 单通道映射 {H, L}（OC 接口按单通道寻址：UH=0 UL=1 VH=2 VL=3） */
+static const uint8_t s_grp_oc[2][2] = {
+    { PWM_OC_UH, PWM_OC_UL },   /* 组 U：OUH=PB9 / OUL=PB8 */
+    { PWM_OC_VH, PWM_OC_VL },   /* 组 V：OVH=PB7 / OVL=PB6 */
+};
+
+uint16_t PwmHw4_GetPeriod(void)
+{
+    return s_tmr4_period;
+}
+
+uint16_t PwmHw4_DutyToCompare(uint32_t duty_pct)
+{
+    if (duty_pct > 100U) {
+        duty_pct = 100U;
+    }
+    return (uint16_t)(((uint32_t)s_tmr4_period + 1U) * duty_pct / 100U);
+}
+
+/* 4 引脚复用到 TIM4_3（功能码 2）：PB9=OUH PB8=OUL PB7=OVH PB6=OVL */
+static void PwmHw4_GpioInit(void)
+{
+    LL_PERIPH_WE(LL_PERIPH_GPIO);
+    GPIO_SetFunc(GPIO_PORT_B, GPIO_PIN_09, PWM_GPIO_FUNC_TMR4);
+    GPIO_SetFunc(GPIO_PORT_B, GPIO_PIN_08, PWM_GPIO_FUNC_TMR4);
+    GPIO_SetFunc(GPIO_PORT_B, GPIO_PIN_07, PWM_GPIO_FUNC_TMR4);
+    GPIO_SetFunc(GPIO_PORT_B, GPIO_PIN_06, PWM_GPIO_FUNC_TMR4);
+    LL_PERIPH_WP(LL_PERIPH_GPIO);
+}
+
+/* H 通道 OCMRH：低有效（count=0 无匹配→低；上计数匹配→高；peak→保持） */
+static void PwmHw4_OcmrH(uint8_t ch_h)
+{
+    un_tmr4_oc_ocmrh_t ocmr;
+
+    ocmr.OCMRx = 0U;                        /* 全部事件默认 HOLD */
+    ocmr.OCMRx_f.OPNZRH = TMR4_OC_LOW;      /* count=0（无匹配）→ 低 */
+    ocmr.OCMRx_f.OPUCH  = TMR4_OC_HIGH;     /* 上计数到达比较值 → 高 */
+    TMR4_OC_SetHighChCompareMode(PWM_TMR4_UNIT, ch_h, ocmr);
+}
+
+/* L 通道 OCMRL：与 H 同相低有效（L 事件依赖 H 匹配状态联合判定，OCCR_L 必须 == OCCR_H）
+   count=0（H/L 均不匹配）→ 低；上计数 H 匹配且 L 匹配 → 高；peak 无匹配 → 保持 */
+static void PwmHw4_OcmrL(uint8_t ch_l)
+{
+    un_tmr4_oc_ocmrl_t ocmr;
+
+    ocmr.OCMRx = 0U;                        /* 全部事件默认 HOLD */
+    ocmr.OCMRx_f.OPNZRL = TMR4_OC_LOW;      /* count=0（H/L 均不匹配）→ 低 */
+    ocmr.OCMRx_f.EOPUCL = TMR4_OC_HIGH;     /* 上计数 H 匹配 & L 匹配 → 高 */
+    TMR4_OC_SetLowChCompareMode(PWM_TMR4_UNIT, ch_l, ocmr);
+}
+
+void PwmHw4_Init(uint32_t freq_hz)
+{
+    stc_tmr4_oc_init_t oc_init;
+    stc_tmr4_pwm_init_t pwm_init;
+    stc_clock_freq_t stcClkFreq;
+    uint32_t u32Pclk1;
+    uint8_t grp;
+
+    if (freq_hz == 0U) {
+        freq_hz = PWM_FREQ_DFT_HZ;
+    }
+
+    /* FCG 时钟门控（写保护域） */
+    LL_PERIPH_WE(LL_PERIPH_FCG);
+    FCG_Fcg2PeriphClockCmd(PWM_TMR4_CLK, ENABLE);
+    LL_PERIPH_WP(LL_PERIPH_FCG);
+
+    PwmHw4_GpioInit();
+
+    /* 周期值：TMR4 计数时钟 = PCLK1（与 TMR6 同源，参考 hc32_drv_timer） */
+    if (LL_OK == CLK_GetClockFreq(&stcClkFreq)) {
+        u32Pclk1 = stcClkFreq.u32Pclk1Freq;
+    } else {
+        u32Pclk1 = CLK_GetBusClockFreq(CLK_BUS_PCLK1);
+    }
+    s_tmr4_period = (uint16_t)(u32Pclk1 / freq_hz - 1U);
+
+    /* 基础计数器：内部时钟、不分频、锯齿波向上计数 */
+    TMR4_SetClockSrc(PWM_TMR4_UNIT, TMR4_CLK_SRC_INTERNCLK);
+    TMR4_SetClockDiv(PWM_TMR4_UNIT, TMR4_CLK_DIV1);
+    TMR4_SetCountMode(PWM_TMR4_UNIT, TMR4_MD_SAWTOOTH);
+    TMR4_SetPeriodValue(PWM_TMR4_UNIT, s_tmr4_period);
+
+    /* U/V 两组：H/L 单通道 OC（比较值 + peak 缓冲 + 低有效 OCMR）+ 停止极性 + 启动 */
+    for (grp = PWM_GRP_U; grp <= PWM_GRP_V; grp++) {
+        uint8_t ch_h = s_grp_oc[grp][0];
+        uint8_t ch_l = s_grp_oc[grp][1];
+
+        /* H/L 两通道分别 OC_Init（比较值同值：L 波形依赖 H/L 同点匹配） */
+        (void)TMR4_OC_StructInit(&oc_init);
+        oc_init.u16CompareValue        = PwmHw4_DutyToCompare(PWM_DUTY_STOP);
+        oc_init.u16OcInvalidPolarity   = TMR4_OC_INVD_LOW;        /* OC 关断输出低 = 安全态 */
+        oc_init.u16CompareModeBufCond  = TMR4_OC_BUF_COND_PEAK;
+        oc_init.u16CompareValueBufCond = TMR4_OC_BUF_COND_PEAK;   /* 改比较值 peak 装载，无毛刺 */
+        oc_init.u16BufLinkTransObject  = 0U;
+        (void)TMR4_OC_Init(PWM_TMR4_UNIT, ch_h, &oc_init);
+        (void)TMR4_OC_Init(PWM_TMR4_UNIT, ch_l, &oc_init);
+
+        PwmHw4_OcmrH(ch_h);
+        PwmHw4_OcmrL(ch_l);
+
+        /* POCR（耦合通道）：直通模式；上电安全态 = 停止态（L 反相 = 混合极性 50%） */
+        (void)TMR4_PWM_StructInit(&pwm_init);                     /* THROUGH + CLK_DIV1 + HOLD/HOLD */
+        pwm_init.u16Polarity = TMR4_PWM_OXH_HOLD_OXL_INVT;
+        (void)TMR4_PWM_Init(PWM_TMR4_UNIT, grp, &pwm_init);
+
+        TMR4_OC_Cmd(PWM_TMR4_UNIT, ch_h, ENABLE);
+        TMR4_OC_Cmd(PWM_TMR4_UNIT, ch_l, ENABLE);
+        TMR4_PWM_StartReloadTimer(PWM_TMR4_UNIT, grp);
+    }
+
+    TMR4_Start(PWM_TMR4_UNIT);
+}
+
+void PwmHw4_SetCompare(uint8_t grp, uint16_t cmp)
+{
+    /* 组内 H/L 同值同写：L 通道波形依赖 H/L 同一计数点匹配，两 OCCR 必须恒等 */
+    TMR4_OC_SetCompareValue(PWM_TMR4_UNIT, s_grp_oc[grp][0], cmp);
+    TMR4_OC_SetCompareValue(PWM_TMR4_UNIT, s_grp_oc[grp][1], cmp);
+}
+
+void PwmHw4_SetRunPolarity(uint8_t grp)
+{
+    TMR4_PWM_SetPolarity(PWM_TMR4_UNIT, grp, TMR4_PWM_OXH_HOLD_OXL_HOLD);
+}
+
+void PwmHw4_SetStopPolarity(uint8_t grp)
+{
+    TMR4_PWM_SetPolarity(PWM_TMR4_UNIT, grp, TMR4_PWM_OXH_HOLD_OXL_INVT);
+}
+
+void PwmHw4_OutputCmd(uint8_t grp, en_functional_state_t enNewState)
+{
+    /* 组内 H/L 一起使能/关断（关断 = 恒低安全态） */
+    TMR4_OC_Cmd(PWM_TMR4_UNIT, s_grp_oc[grp][0], enNewState);
+    TMR4_OC_Cmd(PWM_TMR4_UNIT, s_grp_oc[grp][1], enNewState);
+}
+
+#else /* ===================== 旧 TMRA4 实现（保留，PWM_DRV_USE_TMR4=0） ===================== */
+
 #include <rtthread.h>
 
 /* board.c 的 SysTick 忙等延时；rtthread.h 未声明，显式补充 */
@@ -153,5 +309,7 @@ void PwmHw_CompareDisable(CM_TMRA_TypeDef *TMRAx, uint32_t u32Ch)
 {
     TMRA_PWM_OutputCmd(TMRAx, u32Ch, DISABLE);
 }
+
+#endif /* PWM_DRV_USE_TMR4 */
 
 /* EOF */

@@ -18,6 +18,7 @@
 #define TASK_STACK_ROD      (2048U)  /* rod 推杆位置/状态（含 float 状态机 + Arb_GetData 约360B 局部拷贝 + RTT 打印；256B 曾栈溢出写坏 TCB，见 md_record/INIT卡死-线程饿死与栈溢出.md） */
 #define TASK_STACK_DI       (2048U)  /* di DI 采集（Polarity_Scan 链 + RTT printf 峰值，256B 曾栈溢出） */
 #define TASK_STACK_ARB      (2048U)  /* act 电机仲裁事件线程（rt_mq 阻塞 + 决策） */
+#define TASK_STACK_PWM      (1024U)  /* pwm PWM 调速线程（缓启动状态机 10ms tick + 状态切换打印） */
 #define TASK_STACK_ARB_SELFTEST (1024U)  /* arbtst 仲裁台架自测线程 */
 #define TASK_STACK_LED      (256U)   /* led LED 1s 翻转 */
 #define TASK_STACK_FINSH    (1024U)   /* finsh MSH shell */
@@ -29,6 +30,7 @@
 /* main 由 rtconfig.h 的 RT_MAIN_THREAD_PRIORITY 设定（当前 10），此处仅登记；
    tshell/workq/timer/idle 等 kernel 线程优先级在 rtconfig.h，不在此处 */
 #define TASK_PRIO_ACT           (15U)   /* act 电机仲裁事件线程 */
+#define TASK_PRIO_PWM           (16U)   /* pwm PWM 调速线程（紧随 act，10ms 缓启动 tick） */
 #define TASK_PRIO_LED           (19U)   /* led LED 1s 翻转 */
 #define TASK_PRIO_SYS_SM        (19U)   /* sys_sm 系统状态机事件线程 */
 #define TASK_PRIO_DEV           (18U)   /* dev 设备管理（monitor B 模式） */

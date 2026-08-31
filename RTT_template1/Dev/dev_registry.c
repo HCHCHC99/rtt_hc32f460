@@ -127,7 +127,7 @@ void Dev_RegisterAll(void)
     Dev_Registry_Add(&s_act_module);
 #endif
 #if DEV_ENABLE_PWM
-    /* PWM 输出设备：init 绑定仲裁输出 ops（fwd/rev/stop → 真实 TMRA4 PWM） */
+    /* PWM 输出设备：init 初始化 TMR4_3 + 创建调速线程 + 绑定仲裁输出 ops（fwd/rev/stop） */
     static const SysModule_t s_pwm_module =
         SYS_MODULE_REGISTER(pwm, Dev_Pwm_Init, RT_NULL, DEV_PRIO_MID, 0);
     Dev_Registry_Add(&s_pwm_module);

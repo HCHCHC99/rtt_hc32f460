@@ -17,6 +17,7 @@ static TaskStackItem_t s_task_stack[] = {
     { "rod",      (uint32_t)TASK_STACK_ROD,   UINT32_MAX, 0U },
     { "di",       (uint32_t)TASK_STACK_DI,    UINT32_MAX, 0U },
     { "act",      (uint32_t)TASK_STACK_ARB,   UINT32_MAX, 0U },
+    { "pwm",      (uint32_t)TASK_STACK_PWM,   UINT32_MAX, 0U },
     { "arbtst",   (uint32_t)TASK_STACK_ARB_SELFTEST, UINT32_MAX, 0U },
     { "led",      (uint32_t)TASK_STACK_LED,   UINT32_MAX, 0U },
     { "tshell",   (uint32_t)TASK_STACK_FINSH, UINT32_MAX, 0U },
