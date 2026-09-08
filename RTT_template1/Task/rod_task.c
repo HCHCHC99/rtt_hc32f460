@@ -57,6 +57,10 @@ static void rod_thread_entry(void *param)
     (void)param;
     while (1) {
         Actuator_Tick(rt_tick_get());
+#if DEV_ENABLE_PARAM
+        /* 欠压行程保存状态机驱动：请求后计 2 tick（≈20ms 刹车滑行稳定）写入 Flash */
+        Dev_Param_RodPollSave();
+#endif
         Task_Set_Beat();
         rt_thread_mdelay(ROD_SCAN_PERIOD_MS);
     }

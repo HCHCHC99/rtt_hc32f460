@@ -230,7 +230,8 @@ static void Arb_SelfTest_Start(void)
 
 #if DEV_ENABLE_PARAM
 /* Flash 存储测试开关（volatile：rtt debug 里直接改值触发，非阻塞观测）
- * 1 = 修改一个业务值并保存一组；2 = 连续保存填满当前扇区（剩余只够两组） */
+ * 慢块 A：1 = 修改一个业务值并保存一组；2 = 连续保存填满当前扇区（剩余只够两组）
+ * 快块 B：3 = 保存当前推杆行程一组；4 = 连续保存填满快块当前扇区 */
 volatile int savelabel = 0;
 #endif
 
@@ -281,7 +282,7 @@ int main(void)
         test++;
 
 #if DEV_ENABLE_PARAM
-        /* Flash 存储测试：debug 里把 savelabel 置 1（存一组）/ 2（填满扇区） */
+        /* Flash 存储测试：debug 里改 savelabel（1/2=慢块A，3/4=快块B） */
         if (savelabel == 1) {
             savelabel = 0;
             Dev_Param_SaveTest();
@@ -289,6 +290,15 @@ int main(void)
         if (savelabel == 2) {
             savelabel = 0;
             Dev_Param_FillTest();
+        }
+        if (savelabel == 3) {
+            savelabel = 0;
+            /* 保存当前推杆行程一组（组合调用，无独立测试函数） */
+            (void)Dev_Param_RodSave(RodPosition_GetCurrent(&mySystem.axis[0].position));
+        }
+        if (savelabel == 4) {
+            savelabel = 0;
+            Dev_Param_RodFillTest(RodPosition_GetCurrent(&mySystem.axis[0].position));
         }
 #endif
 

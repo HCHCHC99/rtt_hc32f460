@@ -8,6 +8,8 @@
 #include "dev_state.h"
 #include "dev_event_def.h"
 #include "rtt_manager.h"
+#include "Dev/dev_config.h"
+#include "Dev/dev_param/dev_param.h"
 #include <rtthread.h>
 
 /* 全局系统对象 */
@@ -43,6 +45,12 @@ void App_Model_Init(void)
         RT_ASSERT(ax->evt_act != RT_NULL);
         /* sm_act 暂不挂表（Route B 调 Act_State_Init），保持清零即可 */
     }
+
+#if DEV_ENABLE_PARAM
+    /* 上电恢复推杆位置基准：从 Flash 快块 B 读取欠压时保存的停车位置并置 CALIBRATED
+       （扫描加载在 main 的 Dev_Param_Init 内已完成，此处仅应用；无有效块时跳过） */
+    Dev_Param_RodApply(&mySystem.axis[0].position);
+#endif
 
     /* 4. 上电自动启动（对应原 State_Init 末尾的 EventGroup_Send） */
     Sys_Event_Send(EVT_SYS_INIT_DONE | EVT_SYS_CMD_WORK_ENABLE);

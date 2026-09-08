@@ -19,9 +19,16 @@
 #include "Dev/dev_power/dev_polarity.h"
 #include "Dev/dev_power/dev_cur_sensor.h"
 #include "Dev/dev_power/dev_bus_voltage.h"
+#include "Dev/dev_config.h"
+#include "Dev/dev_param/dev_param.h"
 #include <rtthread.h>
 
 static volatile uint32_t s_arb_cmd_send_fail_count = 0U;
+
+#if DEV_ENABLE_PARAM
+/* 欠压触发的行程保存请求（欠压边沿置位，enter_emergency 刹车后消费，仅一次） */
+static volatile uint8_t s_rod_save_pending = 0U;
+#endif
 
 /* 状态入口函数声明 */
 static void sys_enter_init(void);
@@ -124,6 +131,9 @@ void Sys_State_Dispatch(rt_uint32_t bits)
         POWER_PRINT("under volt mv=%ld th_mv=%ld",
                     (long)(BusVoltage_GetFaultVolt() * 1000.0f),
                     (long)(g_volt_cfg.under_th * 1000.0f));
+#if DEV_ENABLE_PARAM
+        Dev_Param_RodSaveRequest();   /* 欠压边沿请求保存行程（Rod_Task 延时后执行，仅一次） */
+#endif
         StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_VOLT_UNDER);
     }
     if (bits & EVT_SYS_FAULT)         StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_FAULT);
@@ -399,7 +409,9 @@ static void sys_enter_emergency(void)
                                  0U,
                                  RT_TRUE);
     }
-    /* 急停后跳入 FAULT（稳定故障态） */
+    /* 急停后跳入 FAULT（稳定故障态）。
+       欠压触发的行程保存不在此处理：欠压边沿已置保存请求，
+       由 Rod_Task 的 Dev_Param_RodPollSave() 延时 ≈20ms 后自行执行（保持本入口纯净）。 */
     StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_FAULT);
 }
 

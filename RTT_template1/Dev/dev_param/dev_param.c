@@ -1,7 +1,8 @@
 /**
  * @file    dev_param.c
- * @brief   应用参数管理：g_volt_cfg / g_cur_cfg 掉电保存（param_manager 实例）
- * @note    上电 main 调 Dev_Param_Init() 一次；保存走 Dev_Param_Save()（电机运行中拒绝）。
+ * @brief   慢块 A：应用配置参数（g_volt_cfg / g_cur_cfg）掉电保存（param_manager 实例）
+ * @note    上电 main 调 Dev_Param_Init() 一次（内部统一初始化慢块 A + 快块 B，见
+ *          dev_param_rod.c）；保存走 Dev_Param_Save()（电机运行中拒绝）。
  */
 #include "dev_param.h"
 #include "Utils/param_manager.h"
@@ -16,9 +17,9 @@
 
 #if DEV_ENABLE_PARAM
 
-/* 参数区：沿用裸机工程扇区布局（0x7C000 起逆序使用，sec 62 → 56） */
+/* 慢块存储区：0x7C000 起逆序使用（sec 62 → 61，2 扇区；0x78000~0x79FFF 以下归快块 B） */
 #define PARAM_SEC_START         (62U)
-#define PARAM_SEC_END           (56U)
+#define PARAM_SEC_END           (61U)
 
 /* 编译期断言：记录尺寸不超引擎缓冲上限、4 字节对齐 */
 typedef char param_size_check[(sizeof(ParamRecord_t) <= PARAM_MAX_RECORD_SIZE) ? 1 : -1];
@@ -151,6 +152,9 @@ int32_t Dev_Param_Init(void)
         MAIN_D("[PARAM] init FAILED res=%d (keep RAM defaults)", (int)res);
     }
 
+    /* 快块 B（推杆行程）统一在此初始化：扫描加载，待 App_Model_Init 后 RodApply 恢复 */
+    (void)Dev_Param_RodInit();
+
     s_param_inited = 1U;
     return res;
 }
@@ -193,6 +197,7 @@ void Dev_Param_EraseAll(void)
     }
     Param_Debug_EraseAll(&s_param_config, &s_param_runtime, Param_SetDefaults);
     Param_ApplyToDevices();
+    Dev_Param_RodEraseAll();
 }
 
 /*=============================================================================
@@ -259,6 +264,7 @@ static void cmd_param_show(void)
     MAIN_D("[PARAM] runtime: sec=%u addr=0x%08lX saves=%lu last_res=%d",
            (unsigned)s_param_runtime.curr_sec, (unsigned long)s_param_runtime.curr_addr,
            (unsigned long)s_param_runtime.save_count, (int)s_param_runtime.last_res);
+    Dev_Param_RodShow();
 }
 MSH_CMD_EXPORT_ALIAS(cmd_param_show, param_show, show stored param & runtime state);
 
