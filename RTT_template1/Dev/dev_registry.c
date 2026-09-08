@@ -14,6 +14,7 @@
 #include "Dev/dev_power/dev_polarity.h"
 #include "Dev/dev_monitor/dev_monitor.h"
 #include "Dev/dev_act/dev_act.h"
+#include "Dev/dev_gpio_motor/dev_gpio_motor.h"
 #include "Dev/dev_pwm/dev_pwm.h"
 #include "Dev/dev_hall_rod/dev_hall_rod.h"
 #include "Dev/dev_hall_motor/dev_hall_motor.h"
@@ -126,8 +127,13 @@ void Dev_RegisterAll(void)
                                    ARB_THREAD_PRIORITY, ARB_THREAD_STACK_SIZE);
     Dev_Registry_Add(&s_act_module);
 #endif
-#if DEV_ENABLE_PWM
-    /* PWM 输出设备：init 初始化 TMR4_3 + 创建调速线程 + 绑定仲裁输出 ops（fwd/rev/stop） */
+#if DEV_ENABLE_MOTOR_GPIO
+    /* GPIO 输出设备（新板）：init 双脚输出低 + 绑定仲裁输出 ops（fwd/rev/stop，无线程） */
+    static const SysModule_t s_motg_module =
+        SYS_MODULE_REGISTER(motg, Dev_MotorGpio_Init, RT_NULL, DEV_PRIO_MID, 0);
+    Dev_Registry_Add(&s_motg_module);
+#elif DEV_ENABLE_PWM
+    /* PWM 输出设备（旧板）：init 初始化 TMR4_3 + 创建调速线程 + 绑定仲裁输出 ops（fwd/rev/stop） */
     static const SysModule_t s_pwm_module =
         SYS_MODULE_REGISTER(pwm, Dev_Pwm_Init, RT_NULL, DEV_PRIO_MID, 0);
     Dev_Registry_Add(&s_pwm_module);

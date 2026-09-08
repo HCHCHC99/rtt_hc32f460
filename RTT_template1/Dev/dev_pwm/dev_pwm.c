@@ -15,8 +15,11 @@
 #include "Adp/hc32_drv_pwm.h"
 #include "applications/rtt_manager.h"
 #include "Dev/dev_act/dev_act.h"
+#include "Dev/dev_config.h"     /* DEV_ENABLE_PWM：0=新板 GPIO 输出（dev_gpio_motor），本文件整体编译排除 */
 #include <rtthread.h>
 #include <rthw.h>   /* rt_hw_interrupt_disable / enable */
+
+#if DEV_ENABLE_PWM
 
 #if !PWM_DRV_USE_TMR4
 #error "dev_pwm 现行为 TMR4_3 版本；如需切回旧 TMRA 实现请从版本历史恢复本文件"
@@ -291,5 +294,7 @@ void Dev_Pwm_Task(void)
 {
     /* ramp 已内化到 pwm 调速线程（10ms tick），本函数保留兼容注册表签名 */
 }
+
+#endif /* DEV_ENABLE_PWM */
 
 /* EOF */
