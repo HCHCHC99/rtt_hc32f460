@@ -27,6 +27,8 @@
 #define RTT_PRINTF_EN           1   /* RT-Thread rt_kprintf 重定向到 RTT（rt_hw_console_output） */
 #define TASK_STACK_PRINT_EN     0   /* 任务栈统一管理：各线程栈大小/总栈/堆余量 */
 #define PWM_PRINT_EN            1   /* PWM 调速：状态切换/启动/停止（ramp 过程不打） */
+#define FLASH_PRINT_EN          0   /* Flash 驱动：擦/写/解锁流程（量大，默认关） */
+#define PARAM_PRINT_EN          1   /* 参数管理：加载/保存/默认值 */
 /* ===================== 各模块打印宏封装 ===================== */
 #if SYS_STATE_PRINT_EN
 #define SYS_STATE_PRINT(fmt, ...)   MAIN_D("[SYS_STATE] " fmt, ##__VA_ARGS__)
@@ -104,6 +106,18 @@
 #define PWM_PRINT(fmt, ...)         MAIN_D("[PWM] " fmt, ##__VA_ARGS__)
 #else
 #define PWM_PRINT(fmt, ...)         ((void)0)
+#endif
+
+#if FLASH_PRINT_EN
+#define FLASH_PRINT(fmt, ...)       MAIN_D("[FLASH] " fmt, ##__VA_ARGS__)
+#else
+#define FLASH_PRINT(fmt, ...)       ((void)0)
+#endif
+
+#if PARAM_PRINT_EN
+#define PARAM_PRINT(fmt, ...)       MAIN_D("[PARAM] " fmt, ##__VA_ARGS__)
+#else
+#define PARAM_PRINT(fmt, ...)       ((void)0)
 #endif
 
 #if RTT_PRINTF_EN

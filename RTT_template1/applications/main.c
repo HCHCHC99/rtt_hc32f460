@@ -34,6 +34,7 @@
 #include "Task/task_set.h"
 #include "Dev/dev_act/dev_act.h"
 #include "Dev/dev_config.h"
+#include "Dev/dev_param/dev_param.h"
 
 /* dev_sm_thread.c 的 INIT 诊断计数 */
 extern volatile uint32_t g_sm_diag_entered;
@@ -227,6 +228,12 @@ static void Arb_SelfTest_Start(void)
 }
 #endif /* DEV_ENABLE_ARB_SELFTEST */
 
+#if DEV_ENABLE_PARAM
+/* Flash 存储测试开关（volatile：rtt debug 里直接改值触发，非阻塞观测）
+ * 1 = 修改一个业务值并保存一组；2 = 连续保存填满当前扇区（剩余只够两组） */
+volatile int savelabel = 0;
+#endif
+
 int main(void)
 {
     MAIN_D("fw build 2026-08-29-arb2 (sm diag + rtt sync)");
@@ -239,6 +246,10 @@ int main(void)
     rt_kprintf("aaaa");
     /* ADC 设备：绑定 HC32 底层驱动（dev_adc_ops），注册即 init（TMR0_1+AOS 已配置，未启动） */
     Dev_Adc_Bind(&hc32_adc_ops);
+#if DEV_ENABLE_PARAM
+    /* 应用参数：上电扫 Flash 加载 g_volt_cfg/g_cur_cfg（或首次写默认值），只跑一次 */
+    Dev_Param_Init();
+#endif
     Dev_RegisterAll();
     Task_Set_Start();     /* Starvation guard: lowest-prio canary */
 
@@ -268,6 +279,18 @@ int main(void)
     while (1)
     {
         test++;
+
+#if DEV_ENABLE_PARAM
+        /* Flash 存储测试：debug 里把 savelabel 置 1（存一组）/ 2（填满扇区） */
+        if (savelabel == 1) {
+            savelabel = 0;
+            Dev_Param_SaveTest();
+        }
+        if (savelabel == 2) {
+            savelabel = 0;
+            Dev_Param_FillTest();
+        }
+#endif
 
         rt_thread_mdelay(2000);
         monitor_sample_1s();

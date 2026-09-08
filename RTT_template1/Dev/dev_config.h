@@ -17,6 +17,7 @@
 #define DEV_ENABLE_PWM              1   /* 电机 PWM 输出设备（仲裁输出接缝：fwd/rev/stop ops） */
 #define DEV_ENABLE_HALL_ROD         1   /* 推杆霍尔设备（限位消抖 + 双高故障沿） */
 #define DEV_ENABLE_HALL_MOTOR       1   /* 电机霍尔设备（EXTI 计数 + 测速，观测用） */
+#define DEV_ENABLE_PARAM            1   /* 应用参数管理（Flash 掉电保存 g_volt_cfg/g_cur_cfg，main 上电调 Dev_Param_Init） */
 
 /* ============ 设备优先级常量（数字越小优先级越高，与 dev_registry 语义一致） ============ */
 #define DEV_PRIO_HIGH               2

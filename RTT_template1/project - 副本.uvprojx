@@ -394,9 +394,19 @@
               <FilePath>Adp\hc32_drv_gpio.c</FilePath>
             </File>
             <File>
-              <FileName>hc_drv_timer.c</FileName>
+              <FileName>hc32_drv_timer.c</FileName>
               <FileType>1</FileType>
-              <FilePath>Adp\hc_drv_timer.c</FilePath>
+              <FilePath>Adp\hc32_drv_timer.c</FilePath>
+            </File>
+            <File>
+              <FileName>hc32_drv_pwm.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Adp\hc32_drv_pwm.c</FilePath>
+            </File>
+            <File>
+              <FileName>hc32_drv_flash.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Adp\hc32_drv_flash.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -417,6 +427,11 @@
               <FileName>rtt_manager.c</FileName>
               <FileType>1</FileType>
               <FilePath>applications\rtt_manager.c</FilePath>
+            </File>
+            <File>
+              <FileName>rtt_console.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>applications\rtt_console.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -507,6 +522,46 @@
               <FileName>dev_registry.c</FileName>
               <FileType>1</FileType>
               <FilePath>Dev\dev_registry.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_param.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Dev\dev_param\dev_param.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_act.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Dev\dev_act\dev_act.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_monitor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Dev\dev_monitor\dev_monitor.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_hall_rod.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Dev\dev_hall_rod\dev_hall_rod.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_hall_motor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Dev\dev_hall_motor\dev_hall_motor.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_pwm.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Dev\dev_pwm\dev_pwm.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_rod_position.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Dev\dev_rod\dev_rod_position.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_rod_state.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Dev\dev_rod\dev_rod_state.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -607,6 +662,36 @@
               <FileName>dev_power_isr.c</FileName>
               <FileType>1</FileType>
               <FilePath>Dev\dev_power\dev_power_isr.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_polarity.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Dev\dev_power\dev_polarity.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Task</GroupName>
+          <Files>
+            <File>
+              <FileName>task_set.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Task\task_set.c</FilePath>
+            </File>
+            <File>
+              <FileName>led_task.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Task\led_task.c</FilePath>
+            </File>
+            <File>
+              <FileName>di_task.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Task\di_task.c</FilePath>
+            </File>
+            <File>
+              <FileName>rod_task.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Task\rod_task.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -839,6 +924,11 @@
               <FilePath>libraries\hc32f460_ddl\drivers\hc32_ll_driver\src\hc32_ll_tmr0.c</FilePath>
             </File>
             <File>
+              <FileName>hc32_ll_tmr4.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>libraries\hc32f460_ddl\drivers\hc32_ll_driver\src\hc32_ll_tmr4.c</FilePath>
+            </File>
+            <File>
               <FileName>hc32_ll_tmr6.c</FileName>
               <FileType>1</FileType>
               <FilePath>libraries\hc32f460_ddl\drivers\hc32_ll_driver\src\hc32_ll_tmr6.c</FilePath>
@@ -877,6 +967,11 @@
               <FileName>us_timer.c</FileName>
               <FileType>1</FileType>
               <FilePath>Utils\us_timer.c</FilePath>
+            </File>
+            <File>
+              <FileName>param_manager.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>Utils\param_manager.c</FilePath>
             </File>
           </Files>
         </Group>
