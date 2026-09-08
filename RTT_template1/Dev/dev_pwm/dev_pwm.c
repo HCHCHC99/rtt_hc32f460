@@ -284,7 +284,7 @@ void Dev_Pwm_Init(void)
     (void)Arb_BindOutputOps(&s_pwm_out_ops);
 
     s_inited = 1U;
-    PWM_PRINT("init tmr4_3 U=PB9/PB8 V=PB7/PB6 stop=50/50 mixed");
+    PWM_PRINT("init tmr4_3 U/V H-L stop=50/50 mixed");
 }
 
 void Dev_Pwm_Task(void)

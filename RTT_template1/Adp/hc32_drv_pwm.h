@@ -36,15 +36,25 @@
 #define PWM_TMR4_CLK            (FCG2_PERIPH_TMR4_3)
 #define PWM_GPIO_FUNC_TMR4      (GPIO_FUNC_2)   /* PB6~PB9 复用功能码 2 = TIM4_3 */
 
+/* ---- 四输出引脚（引脚与 TIM4_3 通道硬件耦合，端口/引脚成组改） ---- */
+#define PWM_OUH_PORT            (GPIO_PORT_B)   /* PB9 = TIM4_3_OUH（相U高） */
+#define PWM_OUH_PIN             (GPIO_PIN_09)
+#define PWM_OUL_PORT            (GPIO_PORT_B)   /* PB8 = TIM4_3_OUL（相U低） */
+#define PWM_OUL_PIN             (GPIO_PIN_08)
+#define PWM_OVH_PORT            (GPIO_PORT_B)   /* PB7 = TIM4_3_OVH（相V高） */
+#define PWM_OVH_PIN             (GPIO_PIN_07)
+#define PWM_OVL_PORT            (GPIO_PORT_B)   /* PB6 = TIM4_3_OVL（相V低） */
+#define PWM_OVL_PIN             (GPIO_PIN_06)
+
 /* 输出组：极性（POCR）接口按耦合通道寻址（U/V 各管一对 H/L） */
-#define PWM_GRP_U               ((uint8_t)TMR4_PWM_CH_U)    /* OUH=PB9 / OUL=PB8 */
-#define PWM_GRP_V               ((uint8_t)TMR4_PWM_CH_V)    /* OVH=PB7 / OVL=PB6 */
+#define PWM_GRP_U               ((uint8_t)TMR4_PWM_CH_U)    /* OUH / OUL 一对 */
+#define PWM_GRP_V               ((uint8_t)TMR4_PWM_CH_V)    /* OVH / OVL 一对 */
 
 /* OC 单通道：比较值/OCMR/使能接口按单通道寻址（UH=0 UL=1 VH=2 VL=3，奇偶=低/高通道） */
-#define PWM_OC_UH               ((uint8_t)TMR4_OC_CH_UH)    /* PB9 PHU */
-#define PWM_OC_UL               ((uint8_t)TMR4_OC_CH_UL)    /* PB8 PLU */
-#define PWM_OC_VH               ((uint8_t)TMR4_OC_CH_VH)    /* PB7 PHV */
-#define PWM_OC_VL               ((uint8_t)TMR4_OC_CH_VL)    /* PB6 PLV */
+#define PWM_OC_UH               ((uint8_t)TMR4_OC_CH_UH)    /* 接 PWM_OUH 引脚 */
+#define PWM_OC_UL               ((uint8_t)TMR4_OC_CH_UL)    /* 接 PWM_OUL 引脚 */
+#define PWM_OC_VH               ((uint8_t)TMR4_OC_CH_VH)    /* 接 PWM_OVH 引脚 */
+#define PWM_OC_VL               ((uint8_t)TMR4_OC_CH_VL)    /* 接 PWM_OVL 引脚 */
 
 /* ===================== TMR4 接口 ===================== */
 /* 初始化：时钟 + 4 引脚 func2 + 基础计数器 + 4 通道 OC + U/V 组 POCR + 启动；

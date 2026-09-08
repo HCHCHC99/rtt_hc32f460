@@ -245,9 +245,10 @@ typedef struct {
     uint16_t pin;
 } hc32_adc_ch_map_t;
 
+/* 通道绑定宏见 hc32_drv_adc.h（换板/换引脚只改 .h，勿在此写字面量） */
 static const hc32_adc_ch_map_t s_hc32_adc_ch_map[] = {
-    { 6, ADC_CH6, GPIO_PORT_A, GPIO_PIN_06 },
-    { 5, ADC_CH5, GPIO_PORT_A, GPIO_PIN_05 },
+    { ADC_DRV_VOLT_CH, ADC_DRV_VOLT_DDL_CH, ADC_DRV_VOLT_PORT, ADC_DRV_VOLT_PIN },  /* 电压 */
+    { ADC_DRV_CUR_CH,  ADC_DRV_CUR_DDL_CH,  ADC_DRV_CUR_PORT,  ADC_DRV_CUR_PIN  },  /* 电流 */
 };
 
 static adc_drv_inst_t s_hc32_insts[HC32_ADC_MAX_INST];

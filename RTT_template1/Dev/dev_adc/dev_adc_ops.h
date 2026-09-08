@@ -13,7 +13,7 @@
 
 /* 通用 ADC 通道配置（芯片无关，只含换算；端口/引脚由实现层映射） */
 typedef struct {
-    uint8_t channel;    /* 通道号（HC32 为 ADC_CH4 / ADC_CH5） */
+    uint8_t channel;    /* 通道号（HC32 为 ADC_CH4 / ADC_CH6） */
     float   gain;       /* 换算增益 */
     float   offset;     /* 换算偏移 */
     bool    abs;        /* 取绝对值（电流通道 true） */

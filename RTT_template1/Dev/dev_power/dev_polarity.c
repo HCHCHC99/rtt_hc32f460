@@ -102,7 +102,7 @@ void Polarity_Init(void)
     s_nWin.win = 0U; s_nWin.cnt = 0U;
     s_u8PendingState = 0U;
     s_bInit = 1U;
-    POLARITY_PRINT("init win=%u p=PB13 n=PB12", (unsigned)POLARITY_WIN_SIZE);
+    POLARITY_PRINT("init win=%u", (unsigned)POLARITY_WIN_SIZE);
 }
 
 void Polarity_Scan(void)

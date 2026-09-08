@@ -100,14 +100,65 @@ void Sys_State_Dispatch(rt_uint32_t bits)
     /* 故障事件：记录故障码后再投递（过压/欠压/过流先进 EMERGENCY，enter 末尾跳 FAULT）；
        检测在 1ms ISR 完成，打印挪到本线程上下文（ISR 不打印） */
     if (bits & EVT_SYS_OVER_CURRENT) {
-        mySystem.error_code = SYS_ERR_OVER_CURRENT;
-        if (mySystem.fault_bits == 0U) { mySystem.prev_state = (State_t)StateMachine_GetState(&mySystem.sys_sm); }
-        mySystem.fault_bits |= (1U << 0);   /* 过流故障置位 */
-        POWER_PRINT("over curr ma=%ld th=%ld win=%ums",
-                    (long)CurrentSensor_GetFaultMa(),
-                    (long)g_cur_cfg.over_th_ma,
-                    (unsigned)g_cur_cfg.window_ms);
-        StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_OVER_CURRENT);
+        /* 软限位判定：过流（5A/50ms）+ 仲裁输出方向 -> 校准 or 故障
+           - 方向无效/停止：忽略（调试常见，输出已停电流必回落；不进 FAULT）
+           - 伸出+上限窗口使能（或未校准）：请求上限位校准（rod_task 执行，不进 FAULT）
+           - 缩回+下限窗口使能（或未校准）：请求下限位校准
+           - 窗口外（位置记忆在中间）：真故障，走 FAULT（断电清除，无自恢复） */
+        ArbData_t arb;
+        uint8_t arb_dir = DIR_NONE;
+        uint8_t arb_en = 0U;
+        Axis_t *axis = &mySystem.axis[0];
+
+        if (Arb_GetData(0U, &arb) == RT_EOK) {
+            arb_dir = arb.active_dir;
+            arb_en = arb.enable;
+        }
+        if ((arb_en == 0U) || (arb_dir != DIR_FWD && arb_dir != DIR_REV)) {
+            POWER_PRINT("over curr ignored dir=%u en=%u ma=%ld th=%ld win=%ums",
+                        (unsigned)arb_dir, (unsigned)arb_en,
+                        (long)CurrentSensor_GetFaultMa(),
+                        (long)g_cur_cfg.over_th_ma,
+                        (unsigned)g_cur_cfg.window_ms);
+        } else if (arb_dir == DIR_FWD) {
+            /* 伸出中过流：上限窗口使能（或未校准首次）-> 判上限位校准；窗口外 -> 故障 */
+            if (!RodPosition_IsCalibrated(&axis->position) ||
+                RodPosition_IsInCalibZoneMax(&axis->position)) {
+                axis->state.calib_req = ROD_CALIB_REQ_MAX;
+                POWER_PRINT("over curr FWD -> calib req MAX ma=%ld th=%ld win=%ums",
+                            (long)CurrentSensor_GetFaultMa(),
+                            (long)g_cur_cfg.over_th_ma,
+                            (unsigned)g_cur_cfg.window_ms);
+            } else {
+                POWER_PRINT("over curr FAULT FWD ma=%ld th=%ld win=%ums (pos out of calibWin)",
+                            (long)CurrentSensor_GetFaultMa(),
+                            (long)g_cur_cfg.over_th_ma,
+                            (unsigned)g_cur_cfg.window_ms);
+                mySystem.error_code = SYS_ERR_OVER_CURRENT;
+                if (mySystem.fault_bits == 0U) { mySystem.prev_state = (State_t)StateMachine_GetState(&mySystem.sys_sm); }
+                mySystem.fault_bits |= (1U << 0);   /* 过流故障置位 */
+                StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_OVER_CURRENT);
+            }
+        } else {
+            /* 缩回中过流：下限窗口使能（或未校准首次）-> 判下限位校准；窗口外 -> 故障 */
+            if (!RodPosition_IsCalibrated(&axis->position) ||
+                RodPosition_IsInCalibZoneMin(&axis->position)) {
+                axis->state.calib_req = ROD_CALIB_REQ_MIN;
+                POWER_PRINT("over curr REV -> calib req MIN ma=%ld th=%ld win=%ums",
+                            (long)CurrentSensor_GetFaultMa(),
+                            (long)g_cur_cfg.over_th_ma,
+                            (unsigned)g_cur_cfg.window_ms);
+            } else {
+                POWER_PRINT("over curr FAULT REV ma=%ld th=%ld win=%ums (pos out of calibWin)",
+                            (long)CurrentSensor_GetFaultMa(),
+                            (long)g_cur_cfg.over_th_ma,
+                            (unsigned)g_cur_cfg.window_ms);
+                mySystem.error_code = SYS_ERR_OVER_CURRENT;
+                if (mySystem.fault_bits == 0U) { mySystem.prev_state = (State_t)StateMachine_GetState(&mySystem.sys_sm); }
+                mySystem.fault_bits |= (1U << 0);   /* 过流故障置位 */
+                StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_OVER_CURRENT);
+            }
+        }
     }
     if (bits & EVT_SYS_ROD_LIMIT_FAULT) {
         mySystem.error_code = SYS_ERR_ROD_LIMIT;

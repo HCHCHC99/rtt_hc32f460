@@ -2,21 +2,23 @@
  * @file    dev_adc.c
  * @brief   ADC 设备（Dev 层）：通道配置表 + 接口表调用（注册由 Dev_RegisterAll 集中管理）
  * @note    底层驱动通过 dev_adc_ops 注入，Dev 层不依赖具体芯片；
- *          电压 CH6 / 电流 CH5 同一 SEQ_A（时间对齐）；
+ *          电压/电流通道同一 SEQ_A（时间对齐；通道→引脚绑定宏见 Adp/hc32_drv_adc.h）；
  *          采样由 TMR0_1 硬件触发 500us（2kHz），EOCA 中断维护环形缓冲 + 滑动平均窗口；
  *          1ms 检测 ISR 经 Dev_Adc_GetMean 读 10ms 滑动均值。
  */
 #include "dev_adc.h"
 #include "dev_adc_ops.h"
+#include "Adp/hc32_drv_adc.h"   /* ADC_DRV_VOLT_CH / ADC_DRV_CUR_CH：通道号与引脚绑定单点维护 */
 #include <stddef.h>
 
 /* 全局接口表指针（由 Dev_Adc_Bind 注入） */
 static const struct dev_adc_ops *g_adc_ops = NULL;
 
-/* 通道配置表（芯片无关：只含换算；端口/引脚在 HC32 实现层映射） */
+/* 通道配置表（只含换算；通道号/端口/引脚绑定宏在 Adp/hc32_drv_adc.h，
+   id 序 = 表序：id0=电压、id1=电流，Dev_Adc_GetLatest 按此取值，勿换行序） */
 static const dev_adc_ch_cfg_t s_astcChTable[] = {
-    { 6,      16.0f,      0.0f,      false },   /* CH6 电压：PA6，150k:10k 分压，gain=16，满量程 52.8V */
-    { 5,   1.0f,        0.0f,        false },   /* CH5 电流通道：ADC 层仅出电压 V，差分放大器 V→mA 换算在 dev_cur_sensor */
+    { ADC_DRV_VOLT_CH,  16.0f, 0.0f, false },   /* 电压：gain=16 = 150k:10k 分压，满量程 52.8V */
+    { ADC_DRV_CUR_CH,    1.0f, 0.0f, false },   /* 电流：gain=1，ADC 层仅出电压 V，V→mA 换算在 dev_cur_sensor */
 };
 
 

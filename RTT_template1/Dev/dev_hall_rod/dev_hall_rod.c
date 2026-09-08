@@ -56,7 +56,7 @@ void RodHall_Init(void)
     s_fault = false;
     g_rodhall_dbg = 0U;
     s_bInit = 1U;
-    HALL_ROD_PRINT("init win=%u max=PB2 min=PB10", (unsigned)ROD_HALL_WIN_SIZE);
+    HALL_ROD_PRINT("init win=%u max/min high=trigger", (unsigned)ROD_HALL_WIN_SIZE);
 }
 
 void RodHall_Scan(void)

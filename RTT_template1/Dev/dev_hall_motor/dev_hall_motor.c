@@ -474,12 +474,12 @@ void MotorHall_Init(void)
     }
 
     if (s_hw_ready == 0U) {
-        MotorHall_RegisterIrq(1U);   /* A: PA9 */
-        MotorHall_RegisterIrq(0U);   /* B: PA10 */
+        MotorHall_RegisterIrq(1U);   /* A（引脚宏见 dev_hall_motor.h） */
+        MotorHall_RegisterIrq(0U);   /* B */
         s_hw_ready = 1U;
     }
 
-    HALL_MOTOR_PRINT("init axis=%u pa9/pa10 exti both-edge prio=%u",
+    HALL_MOTOR_PRINT("init axis=%u hall A/B exti both-edge prio=%u",
                      (unsigned)MOTOR_HALL_ISR_AXIS, (unsigned)MOTOR_HALL_IRQ_PRIORITY);
 }
 

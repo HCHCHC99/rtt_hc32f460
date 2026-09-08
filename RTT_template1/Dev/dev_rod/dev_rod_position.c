@@ -18,6 +18,10 @@ void RodPosition_Init(RodPosition_t *pos)
     pos->reduction_ratio   = 1.0f;
     pos->pulse_to_mm       = 0.0f;
     pos->calib_tolerance_mm = 0.0f;
+    pos->calib_win_a       = ROD_CALIB_WIN_A_DFT;
+    pos->calib_win_b       = ROD_CALIB_WIN_B_DFT;
+    pos->calib_win_c       = ROD_CALIB_WIN_C_DFT;
+    pos->calib_win_d       = ROD_CALIB_WIN_D_DFT;
 }
 
 void RodPosition_SetParams(RodPosition_t *pos, float stroke_mm, float reduction_ratio,
@@ -43,11 +47,20 @@ void RodPosition_Update(RodPosition_t *pos, int32_t delta_pulses)
         pos->position_mm = -pos->calib_tolerance_mm * 2.0f;
     }
 
-    /* 3. 更新校准区标志 */
-    pos->in_calib_zone_min = (pos->position_mm >= -pos->calib_tolerance_mm) &&
-                             (pos->position_mm <=  pos->calib_tolerance_mm);
-    pos->in_calib_zone_max = (pos->position_mm >= pos->stroke_mm - pos->calib_tolerance_mm) &&
-                             (pos->position_mm <= pos->stroke_mm + pos->calib_tolerance_mm);
+    /* 3. 更新校准使能窗口标志（窗口参数 calib_win_a/b/c/d，flash A 块加载；
+          a>b 视同 a==b、c<d 视同 c==d，宽容处理不报错） */
+    if (pos->calib_win_a < pos->calib_win_b) {
+        pos->in_calib_zone_min = (pos->position_mm >= pos->calib_win_a) &&
+                                 (pos->position_mm <= pos->calib_win_b);
+    } else {
+        pos->in_calib_zone_min = (pos->position_mm <= pos->calib_win_a);
+    }
+    if (pos->calib_win_c > pos->calib_win_d) {
+        pos->in_calib_zone_max = (pos->position_mm >= pos->calib_win_d) &&
+                                 (pos->position_mm <= pos->calib_win_c);
+    } else {
+        pos->in_calib_zone_max = (pos->position_mm >= pos->calib_win_c);
+    }
 
     /* 4. 动态更新校准允许标志 */
     if (pos->calib_state == POSITION_NOT_CALIBRATED) {
@@ -57,7 +70,7 @@ void RodPosition_Update(RodPosition_t *pos, int32_t delta_pulses)
     }
 }
 
-void RodPosition_OnMinLimit(RodPosition_t *pos, bool triggered)
+bool RodPosition_OnMinLimit(RodPosition_t *pos, bool triggered)
 {
     pos->min_limit_triggered = triggered;
     /* 下限位触发且允许校准 -> 重置位置为 0 */
@@ -65,10 +78,12 @@ void RodPosition_OnMinLimit(RodPosition_t *pos, bool triggered)
         pos->position_mm = 0.0f;
         pos->calib_state = POSITION_CALIBRATED;
         pos->calib_pending = false;
+        return true;
     }
+    return false;
 }
 
-void RodPosition_OnMaxLimit(RodPosition_t *pos, bool triggered)
+bool RodPosition_OnMaxLimit(RodPosition_t *pos, bool triggered)
 {
     pos->max_limit_triggered = triggered;
     /* 上限位触发且允许校准 -> 重置位置为总行程 */
@@ -76,7 +91,9 @@ void RodPosition_OnMaxLimit(RodPosition_t *pos, bool triggered)
         pos->position_mm = pos->stroke_mm;
         pos->calib_state = POSITION_CALIBRATED;
         pos->calib_pending = false;
+        return true;
     }
+    return false;
 }
 
 float RodPosition_GetCurrent(const RodPosition_t *pos)      { return pos->position_mm; }

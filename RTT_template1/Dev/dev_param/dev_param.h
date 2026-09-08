@@ -1,8 +1,8 @@
 /**
  * @file    dev_param.h
  * @brief   应用参数管理（param_manager 双实例）：慢块 A（配置参数）+ 快块 B（推杆行程）
- * @note    - 慢块 A：g_volt_cfg / g_cur_cfg 配置，改动少，secStart=62 / secEnd=61（0x7C000 起
- *            逆序，2 扇区），44B 记录，186 次/擦/扇区；
+ * @note    - 慢块 A：g_volt_cfg / g_cur_cfg 配置 + 软限位校准窗口，改动少，secStart=62 /
+ *            secEnd=61（0x7C000 起逆序，2 扇区），60B 记录，136 次/擦/扇区；
  *          - 快块 B：推杆当前行程，欠压急停时保存停车位置，secStart=60 / secEnd=51（0x78000
  *            起逆序，10 扇区），24B 记录，341 次/擦/扇区；
  *          - Dev_Param_Init() 上电由 main 调一次（扫 Flash 加载或写默认值，内部统一初始化
@@ -18,8 +18,8 @@
 #include "Dev/dev_rod/dev_rod_position.h"
 
 /*=============================================================================
- * 慢块 A（配置参数）：44B 记录
- *============================================================================*/
+ * 慢块 A（配置参数）：60B 记录
+ *=============================================================================*/
 
 /* Flash 存储参数记录结构体（布局即存储布局，修改需谨慎；4 字节对齐） */
 #pragma pack(4)
@@ -40,11 +40,21 @@ typedef struct {
     uint16_t cur_window_ms;     /* 过流判定窗口 ms */
     uint16_t reserved;          /* 保留对齐 */
 
+    /* 软限位校准窗口 (RodPosition_t.calib_win_a/b/c/d)，语义见 dev_rod_position.h
+       下限使能：a<b ? pos∈[a,b] : pos<=a   上限使能：c>d ? pos∈[d,c] : pos>=c */
+    float    rod_calib_win_a;   /* 下限窗口下界 a */
+    float    rod_calib_win_b;   /* 下限窗口上界 b */
+    float    rod_calib_win_c;   /* 上限窗口下界 c */
+    float    rod_calib_win_d;   /* 上限窗口上界 d */
+
     /* 尾部信息 */
     uint32_t checksum;          /* CRC32 校验和 */
     uint32_t tail_magic;        /* 尾部魔数 (0xAA44AA44) */
 } ParamRecord_t;
 #pragma pack()
+
+/* 存储记录全局可见（dev_param_rod.c 恢复/保存链路直接读取） */
+extern ParamRecord_t g_param_record;
 
 /*=============================================================================
  * 快块 B（推杆行程）：24B 记录
@@ -86,6 +96,11 @@ int32_t Dev_Param_Init(void);
  * @return PARAM_OK 成功；PARAM_ERR 失败（含电机运行中拒绝）
  */
 int32_t Dev_Param_Save(void);
+
+/**
+ * @brief  float mm -> "[符号]整数.1位" 字符串（4 缓冲轮转；仅同一条打印内连用，勿跨打印保指针）
+ */
+const char *Dev_Param_MmFmtA(float v);
 
 /**
  * @brief  调试：擦除 A+B 全部参数扇区并用默认值重新初始化（param_erase 命令用）

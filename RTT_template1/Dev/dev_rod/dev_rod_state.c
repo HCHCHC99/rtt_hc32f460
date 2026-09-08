@@ -6,7 +6,11 @@
 #include "dev_rod_state.h"
 #include "Dev/dev_mgr/dev_model.h"       /* mySystem / Act_Event_Send */
 #include "Dev/dev_mgr/dev_event_def.h"
-#include "Dev/dev_hall_rod/dev_hall_rod.h" /* 限位/故障稳态源（推杆霍尔设备） */
+#include "Dev/dev_act/dev_act.h"         /* Arb_SendCommand: 限位清允许命令 */
+#include "Dev/dev_config.h"
+#if DEV_ENABLE_HALL_ROD
+#include "Dev/dev_hall_rod/dev_hall_rod.h" /* 限位/故障稳态源（推杆霍尔设备，旧板） */
+#endif
 #include "applications/rtt_manager.h"
 #include <rtthread.h>
 
@@ -36,10 +40,10 @@ static const StateJumpTable_t s_rod_jump[] = {
     {ROD_STATE_RETRACTING,  ROD_EVT_TIMEOUT,       ROD_STATE_RET_FAULT},
     {ROD_STATE_RETRACTING,  ROD_EVT_SENSOR_FAULT,  ROD_STATE_RET_FAULT},
 
-    {ROD_STATE_EXT_LIMIT,   ROD_EVT_CMD_STOP,      ROD_STATE_STOPPED},
+    /* 限位态忽略 CMD_STOP（保持限位直到反向命令）：软限位无持续稳态源，
+       若退回 STOPPED 会导致 limit_ext/ret_sent 不复位、下次到限位不发事件 */
     {ROD_STATE_EXT_LIMIT,   ROD_EVT_CMD_RETRACT,   ROD_STATE_RETRACTING},
 
-    {ROD_STATE_RET_LIMIT,   ROD_EVT_CMD_STOP,      ROD_STATE_STOPPED},
     {ROD_STATE_RET_LIMIT,   ROD_EVT_CMD_EXTEND,    ROD_STATE_EXTENDING},
 
     {ROD_STATE_EXT_FAULT,   ROD_EVT_CMD_STOP,      ROD_STATE_STOPPED},
@@ -69,6 +73,7 @@ void RodState_Init(StateMachine_t *sm, RodStateCtx_t *ctx, uint8_t axis_id, cons
     ctx->axis_id           = axis_id;
     ctx->position          = pos;
     ctx->direction         = ROD_DIR_STOP;
+    ctx->calib_req         = ROD_CALIB_REQ_NONE;
     ctx->fault_code        = 0U;
     ctx->move_start_tick   = 0U;
     ctx->move_timeout_ms   = 5000U;
@@ -80,10 +85,13 @@ void RodState_Init(StateMachine_t *sm, RodStateCtx_t *ctx, uint8_t axis_id, cons
     ctx->limit_reach_count = 0U;
 }
 
-/* 事件合成：优先级 传感器异常 > 限位 > 超时 > 方向指令（限位/故障源 = 推杆霍尔稳态） */
+/* 事件合成：优先级 传感器异常 > 限位 > 超时 > 方向指令
+   限位源二选一：DEV_ENABLE_HALL_ROD=1 推杆霍尔稳态（旧板）；
+                =0 软限位校准请求（sys_sm 过流判定写入，rod_task 消费） */
 static RodEvent_t RodState_SynthesizeEvent(const RodStateCtx_t *ctx, RodState_t st,
                                            RodDirection_t dir, uint32_t tick)
 {
+#if DEV_ENABLE_HALL_ROD
     bool at_max = RodHall_IsAtMax();
     bool at_min = RodHall_IsAtMin();
 
@@ -98,6 +106,14 @@ static RodEvent_t RodState_SynthesizeEvent(const RodStateCtx_t *ctx, RodState_t 
                    st == ROD_STATE_RETRACTING || st == ROD_STATE_RET_LIMIT)) {
         return ROD_EVT_AT_MIN;
     }
+#else
+    if (ctx->calib_req == ROD_CALIB_REQ_MAX) {
+        return ROD_EVT_AT_MAX;
+    }
+    if (ctx->calib_req == ROD_CALIB_REQ_MIN) {
+        return ROD_EVT_AT_MIN;
+    }
+#endif
     if ((st == ROD_STATE_EXTENDING || st == ROD_STATE_RETRACTING) &&
         ctx->move_timeout_ms != 0U && (tick - ctx->move_start_tick) >= ctx->move_timeout_ms) {
         return ROD_EVT_TIMEOUT;
@@ -118,6 +134,7 @@ void RodState_Update(StateMachine_t *sm, RodStateCtx_t *ctx, RodDirection_t dir,
     evt = RodState_SynthesizeEvent(ctx, prev, dir, tick);
     StateMachine_SendEvent(sm, (Event_t)evt);
     cur = (RodState_t)StateMachine_GetState(sm);
+    ctx->calib_req = ROD_CALIB_REQ_NONE;   /* 校准请求一次性消费（hall 版恒 NONE 无影响） */
 
     /* ---- 状态侧效应（按跳变处理） ---- */
     if (cur == ROD_STATE_EXTENDING) {
@@ -143,6 +160,9 @@ void RodState_Update(StateMachine_t *sm, RodStateCtx_t *ctx, RodDirection_t dir,
             ctx->limit_reach_count++;
             if (!ctx->limit_ext_sent) {
                 Act_Event_Send(EVT_ROD_LIMIT_EXTEND); /* 到上限位 -> 通知仲裁 */
+                /* 清伸出允许：仲裁停止输出（反向允许保留，可直接缩回） */
+                (void)Arb_SendCommand(ctx->axis_id, DEV_ID_ROD_LIMIT_FWD, PRIO_LIMIT,
+                                      CMD_TYPE_CLEAR_ALLOW_FWD, 0U, RT_TRUE);
                 ctx->limit_ext_sent = true;
             }
         }
@@ -151,6 +171,9 @@ void RodState_Update(StateMachine_t *sm, RodStateCtx_t *ctx, RodDirection_t dir,
             ctx->limit_reach_count++;
             if (!ctx->limit_ret_sent) {
                 Act_Event_Send(EVT_ROD_LIMIT_RETRACT); /* 到下限位 -> 通知仲裁 */
+                /* 清缩回允许：仲裁停止输出（正向允许保留，可直接伸出） */
+                (void)Arb_SendCommand(ctx->axis_id, DEV_ID_ROD_LIMIT_REV, PRIO_LIMIT,
+                                      CMD_TYPE_CLEAR_ALLOW_REV, 0U, RT_TRUE);
                 ctx->limit_ret_sent = true;
             }
         }

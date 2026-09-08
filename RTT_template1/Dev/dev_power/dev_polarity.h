@@ -1,7 +1,7 @@
 /**
  * @file    dev_polarity.h
  * @brief   电源极性设备：GPIO 双窗口消抖 + 状态判定 + 跳变发事件（1ms ISR）
- * @note    POWER_DIR_P=PB13 / POWER_DIR_N=PB12；各 5 点窗口（Task/di_task 2ms 采样 => 10ms 消抖）；
+ * @note    引脚见下方 POWER_DIR_P_PIN / POWER_DIR_N_PIN 宏（模拟模式下不碰 GPIO）；各 5 点窗口（Task/di_task 2ms 采样 => 10ms 消抖）；
  *          仅在稳定状态跳变沿发轴事件（EVT_ACT_POLARITY_FWD/REV/POWER_ABNORMAL/POWER_LOST）。
  */
 #ifndef __DEV_POLARITY_H__

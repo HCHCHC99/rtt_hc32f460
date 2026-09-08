@@ -40,14 +40,22 @@ typedef enum {
     ROD_EVT_AT_MAX,          /* 到达上限位 */
     ROD_EVT_AT_MIN,          /* 到达下限位 */
     ROD_EVT_TIMEOUT,         /* 运动超时 */
-    ROD_EVT_SENSOR_FAULT,    /* 上下霍尔双高异常 */
+    ROD_EVT_SENSOR_FAULT,    /* 上下霍尔双高异常（仅 DEV_ENABLE_HALL_ROD=1 有源） */
 } RodEvent_t;
+
+/* 软限位校准请求（sys_sm 过流判定写入，rod_task 消费；新板无推杆霍尔时的判定链） */
+typedef enum {
+    ROD_CALIB_REQ_NONE = 0,
+    ROD_CALIB_REQ_MAX,       /* 过流+伸出：请求上限位校准（重置为行程） */
+    ROD_CALIB_REQ_MIN,       /* 过流+缩回：请求下限位校准（重置为 0） */
+} RodCalibReq_t;
 
 /* 推杆状态模块上下文（状态机实例用 Axis_t.sm_act） */
 typedef struct {
     uint8_t              axis_id;         /* 轴序号（日志用） */
     const RodPosition_t *position;      /* 只读位置引用 */
     RodDirection_t       direction;     /* 当前方向指令（来自仲裁） */
+    volatile uint8_t     calib_req;       /* 软限位校准请求（RodCalibReq_t；sys_sm 写，rod_task 消费清零） */
     uint32_t             fault_code;
     uint32_t             move_start_tick;
     uint32_t             move_timeout_ms;     /* 运动超时 ms（5000，0=禁用） */

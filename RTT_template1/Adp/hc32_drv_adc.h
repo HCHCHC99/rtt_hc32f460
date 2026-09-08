@@ -38,7 +38,7 @@ typedef void (*AdcDrvCallback_t)(uint16_t u16AdcValue, uint8_t u8Channel);
 
 /* 通道配置 */
 typedef struct {
-    uint8_t             u8Channel;      /* ADC_CH4 / ADC_CH5 */
+    uint8_t             u8Channel;      /* ADC_CH4 / ADC_CH6 */
     uint8_t             u8Port;
     uint16_t            u16Pin;
     float               fGain;          /* 换算增益 */
@@ -98,6 +98,21 @@ extern const struct dev_adc_ops hc32_adc_ops;
 #define ADC_SEQA_INT_SRC    (INT_SRC_ADC1_EOCA)
 #define ADC_SEQA_INT_IRQn   (INT116_IRQn)
 #define ADC_SEQA_INT_PRIO   (DDL_IRQ_PRIO_06)
+
+/* ==================== 通道→引脚绑定（换板/换引脚只改这里）⚠️ ====================
+ * 引脚与 ADC 通道硬件耦合（PA4=ADC1_IN4、PA6=ADC1_IN6），四项必须成组改：
+ * dev_adc.c 通道表引用 ADC_DRV_VOLT_CH / ADC_DRV_CUR_CH，勿写字面量。
+ * 电压：PA4（150k:10k 分压，gain=16 在 dev_adc.c，满量程 52.8V）；2026-09-08 新板；旧板 PA6/CH6。
+ * 电流：PA6（差分放大器 V→mA 换算在 dev_cur_sensor）；2026-09-08 新板；旧板 PA5/CH5。 */
+#define ADC_DRV_VOLT_CH         (4U)            /* 电压逻辑通道号 = ADC 通道号 */
+#define ADC_DRV_VOLT_DDL_CH     (ADC_CH4)       /* DDL 通道枚举 */
+#define ADC_DRV_VOLT_PORT       (GPIO_PORT_A)
+#define ADC_DRV_VOLT_PIN        (GPIO_PIN_04)
+
+#define ADC_DRV_CUR_CH          (6U)            /* 电流逻辑通道号 = ADC 通道号 */
+#define ADC_DRV_CUR_DDL_CH      (ADC_CH6)
+#define ADC_DRV_CUR_PORT        (GPIO_PORT_A)
+#define ADC_DRV_CUR_PIN         (GPIO_PIN_06)
 #endif /* __HC32_DRV_ADC_H__ */
 
 

@@ -9,24 +9,24 @@
 #define __DEV_HALL_MOTOR_H__
 
 #include <stdint.h>
-#include "hc32_ll.h"      /* GPIO_PORT_A / EXTINT_CH09 / INT_SRC_PORT_EIRQ9 等配置宏 */
+#include "hc32_ll.h"      /* GPIO_PORT_C / EXTINT_CH13 / INT_SRC_PORT_EIRQ13 等配置宏 */
 
 /* ============ 配置宏（统一放头文件，规范 §11） ============ */
 #define MOTOR_HALL_MAX_AXIS_NUM     (2U)    /* 与 MAX_AXIS_NUM(dev_model.h) 保持一致 */
 
-/* GPIO：PA9(A) / PA10(B)，与参考工程一致 */
-#define MOTOR_HALL_A_PORT           GPIO_PORT_A
-#define MOTOR_HALL_A_PIN            GPIO_PIN_09
-#define MOTOR_HALL_B_PORT           GPIO_PORT_A
-#define MOTOR_HALL_B_PIN            GPIO_PIN_10
+/* GPIO：PC13(A) / PC14(B)，新板接线（旧板 PA9/PA10） */
+#define MOTOR_HALL_A_PORT           GPIO_PORT_C
+#define MOTOR_HALL_A_PIN            GPIO_PIN_13
+#define MOTOR_HALL_B_PORT           GPIO_PORT_C
+#define MOTOR_HALL_B_PIN            GPIO_PIN_14
 
-/* EXTI：CH09/CH10 双边沿，INT009/INT010，EIRQ9/EIRQ10 */
-#define MOTOR_HALL_A_EIRQ_CH        EXTINT_CH09
-#define MOTOR_HALL_B_EIRQ_CH        EXTINT_CH10
-#define MOTOR_HALL_A_IRQN           INT009_IRQn
-#define MOTOR_HALL_B_IRQN           INT010_IRQn
-#define MOTOR_HALL_A_IRQ_SRC        INT_SRC_PORT_EIRQ9
-#define MOTOR_HALL_B_IRQ_SRC        INT_SRC_PORT_EIRQ10
+/* EXTI：CH13/CH14 双边沿，INT013/INT014，EIRQ13/EIRQ14 */
+#define MOTOR_HALL_A_EIRQ_CH        EXTINT_CH13
+#define MOTOR_HALL_B_EIRQ_CH        EXTINT_CH14
+#define MOTOR_HALL_A_IRQN           INT013_IRQn
+#define MOTOR_HALL_B_IRQN           INT014_IRQn
+#define MOTOR_HALL_A_IRQ_SRC        INT_SRC_PORT_EIRQ13
+#define MOTOR_HALL_B_IRQ_SRC        INT_SRC_PORT_EIRQ14
 #define MOTOR_HALL_IRQ_PRIORITY     DDL_IRQ_PRIO_02
 
 /* 电机参数：3 极对 × 2 霍尔 × 2 边沿 = 12 边沿/机械转 */

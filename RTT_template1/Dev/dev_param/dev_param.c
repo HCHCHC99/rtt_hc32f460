@@ -67,6 +67,20 @@ static void Param_VoltFmt(float v, char *pBuf, uint32_t bufSize)
 }
 
 /**
+ * @brief  float mm -> "[符号]整数.1位" 字符串（4 缓冲轮转，同条打印多值用）
+ */
+const char *Dev_Param_MmFmtA(float v)
+{
+    static char s_mm_buf[4][12];
+    static uint8_t s_mm_idx = 0U;
+    char *pBuf = s_mm_buf[s_mm_idx];
+
+    s_mm_idx = (uint8_t)((s_mm_idx + 1U) % 4U);
+    Param_VoltFmt(v, pBuf, sizeof(s_mm_buf[0]));
+    return pBuf;
+}
+
+/**
  * @brief  设置默认值（Param_Init 未找到有效块时回调；默认宏见各设备 .h）
  */
 static void Param_SetDefaults(void)
@@ -84,14 +98,21 @@ static void Param_SetDefaults(void)
     g_param_record.cur_window_ms  = (uint16_t)CUR_OVER_WINDOW_MS_DFT;
     g_param_record.reserved       = 0U;
 
+    g_param_record.rod_calib_win_a = ROD_CALIB_WIN_A_DFT;
+    g_param_record.rod_calib_win_b = ROD_CALIB_WIN_B_DFT;
+    g_param_record.rod_calib_win_c = ROD_CALIB_WIN_C_DFT;
+    g_param_record.rod_calib_win_d = ROD_CALIB_WIN_D_DFT;
+
     Param_VoltFmt(VOL_OVER_TH_DFT, s_volt_a, sizeof(s_volt_a));
     Param_VoltFmt(VOL_UNDER_TH_DFT, s_volt_b, sizeof(s_volt_b));
     Param_VoltFmt(VOL_HYST_DFT, s_volt_c, sizeof(s_volt_c));
-    PARAM_PRINT("[PARAM] defaults set: over=%sV under=%sV hyst=%sV rec=%lums cur=%lumA win=%ums",
+    PARAM_PRINT("[PARAM] defaults set: over=%sV under=%sV hyst=%sV rec=%lums cur=%lumA win=%ums calibWin=%s/%s/%s/%s",
                 s_volt_a, s_volt_b, s_volt_c,
                 (unsigned long)VOL_RECOVER_DELAY_MS_DFT,
                 (unsigned long)(CUR_OVER_CUR_TH_MA_DFT + 0.5f),
-                (unsigned)CUR_OVER_WINDOW_MS_DFT);
+                (unsigned)CUR_OVER_WINDOW_MS_DFT,
+                Dev_Param_MmFmtA(ROD_CALIB_WIN_A_DFT), Dev_Param_MmFmtA(ROD_CALIB_WIN_B_DFT),
+                Dev_Param_MmFmtA(ROD_CALIB_WIN_C_DFT), Dev_Param_MmFmtA(ROD_CALIB_WIN_D_DFT));
 }
 
 /**
@@ -142,11 +163,15 @@ int32_t Dev_Param_Init(void)
         Param_VoltFmt(g_param_record.volt_over_th, s_volt_a, sizeof(s_volt_a));
         Param_VoltFmt(g_param_record.volt_under_th, s_volt_b, sizeof(s_volt_b));
         Param_VoltFmt(g_param_record.volt_hyst, s_volt_c, sizeof(s_volt_c));
-        PARAM_PRINT("[PARAM] loaded: over=%sV under=%sV hyst=%sV rec=%lums cur=%lumA win=%ums (seq=%lu)",
+        PARAM_PRINT("[PARAM] loaded: over=%sV under=%sV hyst=%sV rec=%lums cur=%lumA win=%ums calibWin=%s/%s/%s/%s (seq=%lu)",
                     s_volt_a, s_volt_b, s_volt_c,
                     (unsigned long)g_param_record.volt_recover_ms,
                     (unsigned long)(g_param_record.cur_over_th_ma + 0.5f),
                     (unsigned)g_param_record.cur_window_ms,
+                    Dev_Param_MmFmtA(g_param_record.rod_calib_win_a),
+                    Dev_Param_MmFmtA(g_param_record.rod_calib_win_b),
+                    Dev_Param_MmFmtA(g_param_record.rod_calib_win_c),
+                    Dev_Param_MmFmtA(g_param_record.rod_calib_win_d),
                     (unsigned long)g_param_record.sequence_id);
     } else {
         MAIN_D("[PARAM] init FAILED res=%d (keep RAM defaults)", (int)res);
@@ -261,6 +286,11 @@ static void cmd_param_show(void)
            s_volt_a, s_volt_b, s_volt_c, (unsigned long)g_volt_cfg.recover_ms);
     MAIN_D("[PARAM] cur: over=%lumA win=%ums",
            (unsigned long)(g_cur_cfg.over_th_ma + 0.5f), (unsigned)g_cur_cfg.window_ms);
+    MAIN_D("[PARAM] rod calibWin: a=%s b=%s c=%s d=%s",
+           Dev_Param_MmFmtA(g_param_record.rod_calib_win_a),
+           Dev_Param_MmFmtA(g_param_record.rod_calib_win_b),
+           Dev_Param_MmFmtA(g_param_record.rod_calib_win_c),
+           Dev_Param_MmFmtA(g_param_record.rod_calib_win_d));
     MAIN_D("[PARAM] runtime: sec=%u addr=0x%08lX saves=%lu last_res=%d",
            (unsigned)s_param_runtime.curr_sec, (unsigned long)s_param_runtime.curr_addr,
            (unsigned long)s_param_runtime.save_count, (int)s_param_runtime.last_res);

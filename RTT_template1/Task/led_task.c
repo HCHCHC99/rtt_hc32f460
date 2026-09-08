@@ -1,6 +1,6 @@
 /**
  * @file    led_task.c
- * @brief   LED 闪烁任务实现（PH2，1000ms 翻转）
+ * @brief   LED 闪烁任务实现（LED_PIN 见 led_task.h，1000ms 翻转）
  * @note    使用 Adp/hc32_drv_gpio 的 Output_GPIO_Init + Hc32_Gpio_Toggle；
  *          独立线程（C 模式），优先级取低值，栈 1024。
  */

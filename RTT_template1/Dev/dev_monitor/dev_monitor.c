@@ -64,7 +64,7 @@ void Monitor_Task(void)
     (void)Dev_Adc_GetRaw(0, &raw_v);
     (void)Dev_Adc_GetRaw(1, &raw_i);
     (void)Dev_Adc_GetMean(0, &mean_v);
-    (void)Dev_Adc_GetMean(1, &mean_i);   /* CH5 ADC 层只出电压 V（mA 换算在 dev_cur_sensor，见 cur_ma） */
+    (void)Dev_Adc_GetMean(1, &mean_i);   /* CH6 ADC 层只出电压 V（mA 换算在 dev_cur_sensor，见 cur_ma） */
     g_monitor.adc_raw_v   = raw_v;
     g_monitor.adc_raw_i   = raw_i;
     g_monitor.adc_mean_v  = mean_v;       /* V */

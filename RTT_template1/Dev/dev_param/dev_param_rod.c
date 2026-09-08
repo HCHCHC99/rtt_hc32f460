@@ -133,6 +133,16 @@ void Dev_Param_RodApply(RodPosition_t *pos)
     /* 注入位置实例引用（欠压保存时 PollSave 取当前位置用；恢复与否都要注入） */
     s_rod_pos_ptr = pos;
 
+    /* 软限位校准窗口（A 块数据）：无论 B 块有效与否都写入——B 无效走首次校准流程
+       时窗口参数同样要就位（判定在 sys_sm 过流分支） */
+    pos->calib_win_a = g_param_record.rod_calib_win_a;
+    pos->calib_win_b = g_param_record.rod_calib_win_b;
+    pos->calib_win_c = g_param_record.rod_calib_win_c;
+    pos->calib_win_d = g_param_record.rod_calib_win_d;
+    PARAM_PRINT("[RODP] calibWin a=%s b=%s c=%s d=%s",
+                Dev_Param_MmFmtA(pos->calib_win_a), Dev_Param_MmFmtA(pos->calib_win_b),
+                Dev_Param_MmFmtA(pos->calib_win_c), Dev_Param_MmFmtA(pos->calib_win_d));
+
     /* 上电无有效块（默认值路径）：不接管校准，保持原校准流程 */
     if (s_rod_defaults_written != 0U) {
         PARAM_PRINT("[RODP] apply skipped (no valid block)");
