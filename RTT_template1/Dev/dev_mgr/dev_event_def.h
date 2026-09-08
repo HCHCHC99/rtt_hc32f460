@@ -21,6 +21,7 @@
 #define EVT_SYS_OVER_CURRENT          (1U << 8)    /* 过流 */
 #define EVT_SYS_ROD_LIMIT_FAULT        (1U << 9)    /* 推杆上下霍尔故障（双高异常） */
 #define EVT_SYS_ST_WORK_ERROR          (1U << 13)   /* 系统工作：工作错误 */
+#define EVT_SYS_VOLT_RECOVER_WAIT      (1U << 10)   /* 电压回到正常区，开始等恢复延时（dev_bus_voltage ISR 发） */
 
 /* ===================== 轴事件组（多轴预留） ===================== */
 #define EVT_ACT_WORK_ENABLE            (1U << 0)    /* 推杆工作使能 */
@@ -40,6 +41,7 @@
 #define SYS_SM_WAIT_EVENTS \
     (EVT_SYS_INIT_DONE | EVT_SYS_CMD_WORK_ENABLE | EVT_SYS_FAULT | EVT_SYS_EMERGENCY | \
      EVT_SYS_RECOVERY | EVT_SYS_VOLT_OVER | EVT_SYS_VOLT_UNDER | EVT_SYS_VOLT_NORMAL | \
-     EVT_SYS_OVER_CURRENT | EVT_SYS_ROD_LIMIT_FAULT | EVT_SYS_ST_WORK_ERROR)
+     EVT_SYS_OVER_CURRENT | EVT_SYS_ROD_LIMIT_FAULT | EVT_SYS_ST_WORK_ERROR | \
+     EVT_SYS_VOLT_RECOVER_WAIT)
 
 

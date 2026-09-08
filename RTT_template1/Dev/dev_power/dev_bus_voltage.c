@@ -21,6 +21,7 @@ static volatile uint8_t s_u8Status;    /* 0 正常 1 欠压 2 过压 */
 static uint8_t s_u8Fault;
 static uint8_t s_u8Waiting;
 static uint32_t s_u32RecoverCnt;       /* 恢复延时累计 ms（仅 ISR） */
+static volatile float   s_fFaultVolt;  /* 故障触发瞬间的电压快照 V（ISR 写，sys_sm 打印读） */
 
 
 
@@ -31,6 +32,7 @@ void BusVoltage_Init(void)
     s_u8Fault = 0U;
     s_u8Waiting = 0U;
     s_u32RecoverCnt = 0U;
+    s_fFaultVolt = 0.0f;
 }
 
 /* 1ms ISR 检测（由 Dev_Power_Isr1ms 经 TMR0_2 心跳调用；ISR 内不打印） */
@@ -56,6 +58,7 @@ void BusVoltage_Isr1ms(void)
             if (s_u8Waiting == 0U) {
                 s_u8Waiting = 1U;
                 s_u32RecoverCnt = 0U;
+                Sys_Event_Send(EVT_SYS_VOLT_RECOVER_WAIT);   /* 通知 sys_sm 打印"电压回到正常区，开始等恢复延时" */
             } else {
                 s_u32RecoverCnt++;
                 if (s_u32RecoverCnt >= g_volt_cfg.recover_ms) {
@@ -71,8 +74,10 @@ void BusVoltage_Isr1ms(void)
     } else {
         if (fVolt > g_volt_cfg.over_th) {
             s_u8Fault = 2U;
+            s_fFaultVolt = fVolt;      /* 锁存过压触发瞬间的电压值 */
         } else if (fVolt < g_volt_cfg.under_th) {
             s_u8Fault = 1U;
+            s_fFaultVolt = fVolt;      /* 锁存欠压触发瞬间的电压值 */
         }
     }
     s_u8Status = s_u8Fault;
@@ -84,6 +89,7 @@ void BusVoltage_Isr1ms(void)
         } else if (s_u8Fault == 1U) {
             Sys_Event_Send(EVT_SYS_VOLT_UNDER);
         } else {
+            s_fFaultVolt = fVolt;      /* 恢复时刻电压，供 sys_sm 打印恢复值 */
             Sys_Event_Send(EVT_SYS_VOLT_NORMAL);   /* 电压恢复正常（过迟滞+恢复延时） */
         }
     }
@@ -93,6 +99,11 @@ void BusVoltage_GetInfo(float *pfVolt_V, uint8_t *pu8Status)
 {
     if (pfVolt_V != NULL)  *pfVolt_V = s_fVolt;
     if (pu8Status != NULL) *pu8Status = s_u8Status;
+}
+
+float BusVoltage_GetFaultVolt(void)
+{
+    return s_fFaultVolt;
 }
 
 /* EOF */

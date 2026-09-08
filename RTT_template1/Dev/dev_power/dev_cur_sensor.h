@@ -28,6 +28,7 @@ void CurrentSensor_Init(void);
 void CurrentSensor_Isr1ms(void); /* 1ms ISR 检测（TMR0_2 心跳调用） */
 void CurrentSensor_GetInfo(float *pfCurr_mA, uint8_t *pu8Status);  /* 0=正常 1=过流 */
 uint16_t CurrentSensor_GetOverMs(void);                    /* 当前超阈值累计时间（ms），观测用 */
+float    CurrentSensor_GetFaultMa(void);                   /* 故障触发瞬间的电流快照 mA（sys_sm 打印用） */
 
 #endif /* __DEV_CUR_SENSOR_H__ */
 

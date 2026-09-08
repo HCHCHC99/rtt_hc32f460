@@ -18,6 +18,7 @@ volatile uint32_t g_sm_diag_recv_ok = 0U;
 static void sys_sm_thread_entry(void *param)
 {
     rt_uint32_t e;
+    char evt_name[64];
 
     (void)param;
     g_sm_diag_entered = 1U;
@@ -27,7 +28,8 @@ static void sys_sm_thread_entry(void *param)
                           RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR,
                           RT_WAITING_FOREVER, &e) == RT_EOK) {
             g_sm_diag_recv_ok++;
-            MAIN_D_SYNC("[SYS_STATE] sm dispatch evt=0x%08x", (unsigned)e);
+            Sys_EventBitsName(e, evt_name, (rt_uint32_t)sizeof(evt_name));
+            MAIN_D_SYNC("[SYS_STATE] sm dispatch evt=0x%08x (%s)", (unsigned)e, evt_name);
             Sys_State_Dispatch(e);
         }
         else {

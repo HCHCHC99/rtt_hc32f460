@@ -29,6 +29,7 @@ extern volatile VoltCfg_t g_volt_cfg;
 void BusVoltage_Init(void);
 void BusVoltage_Isr1ms(void); /* 1ms ISR 检测（TMR0_2 心跳调用） */
 void BusVoltage_GetInfo(float *pfVolt_V, uint8_t *pu8Status);  /* 0=正常 1=欠压 2=过压 */
+float BusVoltage_GetFaultVolt(void);  /* 故障触发瞬间的电压快照 V（sys_sm 打印用） */
 
 #endif /* __DEV_BUS_VOLTAGE_H__ */
 

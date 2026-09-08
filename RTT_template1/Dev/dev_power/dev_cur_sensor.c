@@ -23,6 +23,7 @@ volatile uint32_t g_cur_sim_ma = 500U;    /* 模拟电流 mA（CUR_SIM_MODE_EN=1
 static volatile float    s_fCurrMa;      /* 1ms ISR 写，主循环/GetInfo 读 */
 static volatile uint8_t  s_u8Status;     /* 0 正常 1 过流 */
 static uint16_t s_u16OverMs;             /* 超阈值累计 ms（仅 ISR） */
+static volatile float    s_fFaultMa;     /* 故障触发瞬间的电流快照 mA（ISR 写，sys_sm 打印读） */
 
 
 
@@ -31,6 +32,7 @@ void CurrentSensor_Init(void)
     s_fCurrMa = 0.0f;
     s_u8Status = 0U;
     s_u16OverMs = 0U;
+    s_fFaultMa = 0.0f;
 }
 
 /* 1ms ISR 检测（由 Dev_Power_Isr1ms 经 TMR0_2 心跳调用；ISR 内不打印） */
@@ -64,6 +66,7 @@ void CurrentSensor_Isr1ms(void)
     /* 过流跳变 -> 事件通知系统状态机（打印在 sys_sm 线程） */
     if (s_u8Status != u8Prev) {
         if (s_u8Status == 1U) {
+            s_fFaultMa = fCurrMa;      /* 锁存故障触发瞬间的电流值，供 sys_sm 打印 */
             Sys_Event_Send(EVT_SYS_OVER_CURRENT);
         }
     }
@@ -78,6 +81,11 @@ void CurrentSensor_GetInfo(float *pfCurr_mA, uint8_t *pu8Status)
 uint16_t CurrentSensor_GetOverMs(void)
 {
     return s_u16OverMs;
+}
+
+float CurrentSensor_GetFaultMa(void)
+{
+    return s_fFaultMa;
 }
 
 /* EOF */

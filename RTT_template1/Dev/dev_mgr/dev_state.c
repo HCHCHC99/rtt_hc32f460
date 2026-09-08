@@ -17,6 +17,8 @@
 #include "Dev/dev_power/dev_power_isr.h"
 #include "Dev/dev_act/dev_act.h"
 #include "Dev/dev_power/dev_polarity.h"
+#include "Dev/dev_power/dev_cur_sensor.h"
+#include "Dev/dev_power/dev_bus_voltage.h"
 #include <rtthread.h>
 
 static volatile uint32_t s_arb_cmd_send_fail_count = 0U;
@@ -94,7 +96,10 @@ void Sys_State_Dispatch(rt_uint32_t bits)
         mySystem.error_code = SYS_ERR_OVER_CURRENT;
         if (mySystem.fault_bits == 0U) { mySystem.prev_state = (State_t)StateMachine_GetState(&mySystem.sys_sm); }
         mySystem.fault_bits |= (1U << 0);   /* 过流故障置位 */
-        POWER_PRINT("over curr");
+        POWER_PRINT("over curr ma=%ld th=%ld win=%ums",
+                    (long)CurrentSensor_GetFaultMa(),
+                    (long)g_cur_cfg.over_th_ma,
+                    (unsigned)g_cur_cfg.window_ms);
         StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_OVER_CURRENT);
     }
     if (bits & EVT_SYS_ROD_LIMIT_FAULT) {
@@ -107,14 +112,18 @@ void Sys_State_Dispatch(rt_uint32_t bits)
         mySystem.error_code = SYS_ERR_VOLT_OVER;
         if (mySystem.fault_bits == 0U) { mySystem.prev_state = (State_t)StateMachine_GetState(&mySystem.sys_sm); }
         mySystem.fault_bits |= (1U << 1);   /* 过压故障置位 */
-        POWER_PRINT("over volt");
+        POWER_PRINT("over volt mv=%ld th_mv=%ld",
+                    (long)(BusVoltage_GetFaultVolt() * 1000.0f),
+                    (long)(g_volt_cfg.over_th * 1000.0f));
         StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_VOLT_OVER);
     }
     if (bits & EVT_SYS_VOLT_UNDER) {
         mySystem.error_code = SYS_ERR_VOLT_UNDER;
         if (mySystem.fault_bits == 0U) { mySystem.prev_state = (State_t)StateMachine_GetState(&mySystem.sys_sm); }
         mySystem.fault_bits |= (1U << 2);   /* 欠压故障置位 */
-        POWER_PRINT("under volt");
+        POWER_PRINT("under volt mv=%ld th_mv=%ld",
+                    (long)(BusVoltage_GetFaultVolt() * 1000.0f),
+                    (long)(g_volt_cfg.under_th * 1000.0f));
         StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_VOLT_UNDER);
     }
     if (bits & EVT_SYS_FAULT)         StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_FAULT);
@@ -126,15 +135,38 @@ void Sys_State_Dispatch(rt_uint32_t bits)
     }
     /* 电压恢复正常：清电压故障位；全部故障清除 -> 自动恢复（FAULT/EMERGENCY -> IDLE） */
     if (bits & EVT_SYS_VOLT_NORMAL) {
+        uint8_t u8Remain = mySystem.fault_bits & ~((1U << 1) | (1U << 2));
         mySystem.fault_bits &= ~((1U << 1) | (1U << 2));   /* 清过压/欠压位 */
         if (mySystem.fault_bits == 0U) {
             mySystem.error_code = SYS_ERR_NONE;
-            POWER_PRINT("volt normal, auto recover");
+            if (mySystem.prev_state == (State_t)SYS_STATE_RUN) {
+                POWER_PRINT("volt normal mv=%ld, auto recover->RUN",
+                            (long)(BusVoltage_GetFaultVolt() * 1000.0f));
+            } else {
+                POWER_PRINT("volt normal mv=%ld, auto recover->IDLE (prev=%u)",
+                            (long)(BusVoltage_GetFaultVolt() * 1000.0f),
+                            (unsigned)mySystem.prev_state);
+            }
             StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_RECOVERY);
-        if (mySystem.prev_state == (State_t)SYS_STATE_RUN) {
-            StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_CMD_WORK_ENABLE);   /* 回故障前状态：RUN */
+            if (mySystem.prev_state == (State_t)SYS_STATE_RUN) {
+                StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_CMD_WORK_ENABLE);   /* 回故障前状态：RUN */
+            }
+        } else {
+            /* 电压故障清了但还有别的故障（过流/推杆），只清码，继续等其它故障恢复 */
+            POWER_PRINT("volt normal mv=%ld, partial clear remain=0x%02X",
+                        (long)(BusVoltage_GetFaultVolt() * 1000.0f),
+                        (unsigned)u8Remain);
         }
-        }
+    }
+    /* 电压回到正常区间（过迟滞），开始等恢复延时；故障状态机不跳变，仅诊断打印 */
+    if (bits & EVT_SYS_VOLT_RECOVER_WAIT) {
+        float fVolt = 0.0f;
+        uint8_t u8Status = 0U;
+        BusVoltage_GetInfo(&fVolt, &u8Status);
+        POWER_PRINT("volt back to normal mv=%ld hyst_mv=%ld wait=%ums",
+                    (long)(fVolt * 1000.0f),
+                    (long)(g_volt_cfg.hyst * 1000.0f),
+                    (unsigned)g_volt_cfg.recover_ms);
     }
     if (bits & EVT_SYS_INIT_DONE)     StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_INIT_DONE);
     if (bits & EVT_SYS_CMD_WORK_ENABLE) StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_CMD_WORK_ENABLE);
@@ -177,6 +209,7 @@ void Sys_EventBitsName(rt_uint32_t bits, char *buf, rt_uint32_t size)
         {EVT_SYS_OVER_CURRENT,    "OVER_CURRENT"},
         {EVT_SYS_ROD_LIMIT_FAULT, "ROD_LIMIT_FAULT"},
         {EVT_SYS_ST_WORK_ERROR,   "ST_WORK_ERROR"},
+        {EVT_SYS_VOLT_RECOVER_WAIT, "VOLT_RECOVER_WAIT"},
     };
     rt_uint32_t i;
     rt_uint32_t pos = 0U;
