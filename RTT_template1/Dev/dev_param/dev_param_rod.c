@@ -11,10 +11,10 @@
  *          - 本模块不依赖 mySystem：位置实例经 RodApply 注入，测试钩子传参。
  */
 #include "dev_param.h"
-#include "param_manager.h"
-#include "rtt_manager.h"
+#include "Utils/param_manager.h"
+#include "applications/rtt_manager.h"
 #include "rtthread.h"
-#include "dev_config.h"
+#include "Dev/dev_config.h"
 #include <stddef.h>
 #include <string.h>
 
@@ -90,10 +90,12 @@ static void Rod_SetDefaults(void)
     (void)memset(&s_rod_record, 0, sizeof(ParamStrokeRecord_t));
     s_rod_record.head_magic = PARAM_ROD_MAGIC_HEAD;
     s_rod_record.tail_magic = PARAM_ROD_MAGIC_TAIL;
-    s_rod_record.position_mm = PARAM_ROD_STROKE_DFT;   /* 行程默认 mm（单点见 dev_param.h） */
+    s_rod_record.position_mm = PARAM_ROD_STROKE_DFT;
 
     s_rod_defaults_written = 1U;
-    PARAM_PRINT("[RODP] defaults set (stroke dft = PARAM_ROD_STROKE_DFT in dev_param.h)");
+    PARAM_PRINT("[RODP] defaults set (stroke=%d.%01dmm)",
+                (int)PARAM_ROD_STROKE_DFT,
+                (int)((PARAM_ROD_STROKE_DFT < 0.0f ? -PARAM_ROD_STROKE_DFT : PARAM_ROD_STROKE_DFT) * 10.0f + 0.5f) % 10);
 }
 
 /*=============================================================================

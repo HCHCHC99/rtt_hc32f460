@@ -1,10 +1,7 @@
 /**
  * @file    dev_param.h
  * @brief   应用参数管理（param_manager 双实例）：慢块 A（配置参数）+ 快块 B（推杆行程）
- * @note    - 存储默认值单点：A/B 两块全部字段的首次上电默认宏集中定义在本头文件
- *            "存储默认值"区块（各设备 RAM 初始值也引用该组宏）；
- *          - 慢块 A：g_volt_cfg / g_cur_cfg 配置 + 软限位校准窗口 + 停止裕量 + 方向序
- *            （hall_dir_seq 霍尔判向 / motor_dir_seq 输出转向，改动少），
+ * @note    - 慢块 A：g_volt_cfg / g_cur_cfg 配置 + 软限位校准窗口 + 停止裕量，改动少，
  *            secStart=62 / secEnd=61（0x7C000 起逆序，2 扇区），64B 记录，128 次/擦/扇区；
  *          - 快块 B：推杆当前行程，欠压急停时保存停车位置，secStart=60 / secEnd=51（0x78000
  *            起逆序，10 扇区），24B 记录，341 次/擦/扇区；
@@ -18,7 +15,7 @@
 #define __DEV_PARAM_H__
 
 #include <stdint.h>
-#include "dev_rod_position.h"
+#include "Dev/dev_rod/dev_rod_position.h"
 
 /*=============================================================================
  * 慢块 A（配置参数）：60B 记录
@@ -38,12 +35,11 @@ typedef struct {
     float    volt_hyst;         /* 迟滞回差 V */
     uint32_t volt_recover_ms;   /* 恢复延时 ms */
 
-    /* 电流传感器配置 (CurCfg_t)；末 2 字节由原 reserved 拆分为方向序字段
-       （偏移/尺寸不变，旧记录 CRC 兼容；旧 reserved=0 恰为标准方向默认值） */
+    /* 电流传感器配置 (CurCfg_t) */
     float    cur_over_th_ma;    /* 过流阈值 mA */
     uint16_t cur_window_ms;     /* 过流判定窗口 ms */
-    uint8_t  hall_dir_seq;      /* 霍尔判向顺序：0=标准相序（B沿采样A，A高=正转） 1=反相序（A高=反转）→ 上电写 g_mothall_invert_dir */
-    uint8_t  motor_dir_seq;     /* 电机输出转向：0=标准（FWD输出=正转/伸出） 1=互换（FWD输出=反转/缩回）→ 上电调 Dev_MotorGpio_SetDirInvert */
+    uint8_t  hall_dir_seq;      /* 霍尔判向相序：0=标准(B沿采样A,A高=FWD) 1=反置（原 uint16 reserved 拆分，偏移/大小不变，旧记录 CRC 兼容） */
+    uint8_t  motor_dir_seq;     /* 电机输出相序：0=FWD→伸出(PB8) 1=交换FWD/REV输出 */
 
     /* 软限位校准窗口 (RodPosition_t.calib_win_a/b/c/d)，语义见 dev_rod_position.h
        下限使能：a<b ? pos∈[a,b] : pos<=a   上限使能：c>d ? pos∈[d,c] : pos>=c */
@@ -61,36 +57,6 @@ typedef struct {
 
 /* 存储记录全局可见（dev_param_rod.c 恢复/保存链路直接读取） */
 extern ParamRecord_t g_param_record;
-
-/*=============================================================================
- * 存储默认值（单点定义）：首次全片擦除/上电无有效块时 Param_SetDefaults /
- * Rod_SetDefaults 写入记录的值。A/B 两块所有默认值只在此定义，设备模块
- * RAM 初始值亦引用同一组宏（各设备 .c include 本头文件），改默认值只改这里。
- *=============================================================================*/
-/* ---- A 块：母线电压配置 ---- */
-#define VOL_OVER_TH_DFT          (26.0f)   /* 过压阈值默认 V */
-#define VOL_UNDER_TH_DFT         (20.0f)   /* 欠压阈值默认 V */
-#define VOL_HYST_DFT             (1.0f)    /* 迟滞回差默认 V（1V） */
-#define VOL_RECOVER_DELAY_MS_DFT (500U)    /* 恢复延时默认 ms */
-
-/* ---- A 块：电流传感器配置 ---- */
-#define CUR_OVER_CUR_TH_MA_DFT   (5000.0f) /* 过流阈值默认 mA（5A） */
-#define CUR_OVER_WINDOW_MS_DFT   (50U)     /* 过流判定窗口默认 ms */
-
-/* ---- A 块：软限位校准窗口 + 停止裕量（语义见 RodPosition_t 字段注释；
-   默认 998 依赖默认行程 1000mm，行程变更时同步修改） ---- */
-#define ROD_CALIB_WIN_A_DFT      (2.0f)    /* 下限窗口下界 a：a<b 时使能区间 [a,b] */
-#define ROD_CALIB_WIN_B_DFT      (2.0f)    /* 下限窗口上界 b：a==b（含 a>b 宽容）时使能 pos<=a（半开） */
-#define ROD_CALIB_WIN_C_DFT      (998.0f)  /* 上限窗口下界 c：c==d（含 c<d 宽容）时使能 pos>=c（半开） */
-#define ROD_CALIB_WIN_D_DFT      (998.0f)  /* 上限窗口上界 d：c>d 时使能区间 [d,c] */
-#define ROD_STOP_MARGIN_DFT      (4.0f)    /* 停止裕量 mm（40×0.1mm；0=无裕量，到行程才停） */
-
-/* ---- A 块：方向序 ---- */
-#define MOTOR_HALL_DIRECTION_INVERT_DEFAULT (0U)  /* 霍尔判向顺序默认：0=标准相序（B沿采样A，A高=正转） 1=反相序 */
-#define MOTOR_GPIO_DIR_INVERT_DEFAULT       (0U)  /* 电机输出转向默认：0=标准（FWD输出=伸出） 1=互换（FWD输出=缩回） */
-
-/* ---- B 块：推杆行程 ---- */
-#define PARAM_ROD_STROKE_DFT     (0.0f)    /* 行程默认 mm（无有效块时不接管校准，走首次校准流程） */
 
 /*=============================================================================
  * 快块 B（推杆行程）：24B 记录
@@ -114,6 +80,32 @@ typedef struct {
     uint32_t tail_magic;        /* 尾部魔数 (0xAA66AA66) */
 } ParamStrokeRecord_t;
 #pragma pack()
+
+/*=============================================================================
+ * 存储默认值宏（单点）：A 块全部默认值 + B 块行程默认值。
+ * 全片擦除后首次上电由 Param_SetDefaults / Rod_SetDefaults 加载；
+ * 其它模块 .c 一律 include 本头文件取宏，禁止再散落定义。
+ *=============================================================================*/
+#define VOL_OVER_TH_DFT             (26.0f)   /* 过压阈值 V */
+#define VOL_UNDER_TH_DFT            (20.0f)   /* 欠压阈值 V（必须明显高于 VOL_OFFSET 1.2V 偏置，否则无 24V 时 SeenValid 误判） */
+#define VOL_HYST_DFT                (1.0f)    /* 迟滞回差 V */
+#define VOL_RECOVER_DELAY_MS_DFT    (500U)    /* 电压恢复延时 ms */
+
+#define CUR_OVER_CUR_TH_MA_DFT      (5000.0f) /* 过流阈值 mA */
+#define CUR_OVER_WINDOW_MS_DFT      (50U)     /* 过流判定窗口 ms */
+
+/* 软限位校准窗口默认：a=b=2 / c=d=998（窄窗形式，语义见 dev_rod_position.h） */
+#define ROD_CALIB_WIN_A_DFT         (2.0f)    /* 下限窗口下界 a */
+#define ROD_CALIB_WIN_B_DFT         (2.0f)    /* 下限窗口上界 b */
+#define ROD_CALIB_WIN_C_DFT         (998.0f)  /* 上限窗口下界 c */
+#define ROD_CALIB_WIN_D_DFT         (998.0f)  /* 上限窗口上界 d */
+#define ROD_STOP_MARGIN_DFT         (4.0f)    /* 推杆停止裕量 mm（位置停车：pos>=行程-裕量） */
+
+/* 方向相序默认（0=标准；板上实测相反时用 msh dir_set 改并保存） */
+#define HALL_DIR_SEQ_DFT            (0U)      /* 霍尔判向：0=标准(B沿采样A,A高=FWD) 1=反置 */
+#define MOTOR_DIR_SEQ_DFT           (0U)      /* 电机输出：0=FWD→PB8伸出 1=交换FWD/REV */
+
+#define PARAM_ROD_STROKE_DFT        (0.0f)    /* 快块 B 行程默认 mm（0=无有效块走首次校准） */
 
 /*=============================================================================
  * 外部接口

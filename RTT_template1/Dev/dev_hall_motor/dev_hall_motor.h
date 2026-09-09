@@ -34,9 +34,8 @@
 #define MOTOR_HALL_HALL_COUNT       (2U)
 #define MOTOR_HALL_CUSTOM_PULSES_PER_REV  (0U)   /* 0=按极对×霍尔数自动算 */
 
-/* A/B 判向顺序默认值宏（MOTOR_HALL_DIRECTION_INVERT_DEFAULT）已集中至
-   Dev/dev_param/dev_param.h（存储默认值单点）；上电由 A 块 hall_dir_seq 覆盖
-   g_mothall_invert_dir，运行时 Watch 仍可直改该变量 */
+/* A/B 接线反接时置 1（运行时 Watch 可改 g_mothall_invert_dir） */
+#define MOTOR_HALL_DIRECTION_INVERT_DEFAULT  (0U)
 
 /* 测量参数（与参考 Motor_hall.c 完全一致） */
 #define MOTOR_HALL_MIN_PULSE_INTERVAL_US   (50U)

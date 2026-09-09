@@ -23,6 +23,8 @@ static void Arb_DefaultOutputRev(uint8_t axis_id, uint8_t duty_pct);
 static void Arb_DefaultOutputStop(uint8_t axis_id);
 static uint8_t Arb_GetAxisId(const ArbData_t *arb);
 static void Arb_ProcessMessage(ArbData_t *arb, const ArbCommandMsg_t *msg);
+static void Arb_RemoveOppositePowerAllow(ArbData_t *arb,
+                                         const ArbCommandMsg_t *msg);
 static void Arb_CmdListRemove(ArbCommandQueue_t *queue, uint8_t device_id);
 static void Arb_CmdListSetAllow(ArbCommandQueue_t *queue,
                                 ArbCommandQueue_t *block_queue,
@@ -255,6 +257,10 @@ void Arb_ThreadEntry(void *parameter)
 
 static void Arb_ProcessMessage(ArbData_t *arb, const ArbCommandMsg_t *msg)
 {
+    /* 正/负电源检测是同一个物理方向源：换向时替换旧方向 allow，
+       避免 3.3V 预供电期间残留 REV 后，24V 正向沿触发同优先级冲突停机。 */
+    Arb_RemoveOppositePowerAllow(arb, msg);
+
     switch ((ArbCmdType_t)msg->cmd_type) {
         case CMD_TYPE_RUN_FWD:
             Arb_CmdListRemove(&arb->block_fwd, msg->device_id);
@@ -322,6 +328,21 @@ static void Arb_ProcessMessage(ArbData_t *arb, const ArbCommandMsg_t *msg)
 
         default:
             break;
+    }
+}
+
+static void Arb_RemoveOppositePowerAllow(ArbData_t *arb,
+                                         const ArbCommandMsg_t *msg)
+{
+    if ((msg->cmd_type != (uint8_t)CMD_TYPE_RUN_FWD) &&
+        (msg->cmd_type != (uint8_t)CMD_TYPE_RUN_REV)) {
+        return;
+    }
+
+    if (msg->device_id == (uint8_t)DEV_ID_POWER_POS) {
+        Arb_CmdListRemove(&arb->allow_rev, (uint8_t)DEV_ID_POWER_NEG);
+    } else if (msg->device_id == (uint8_t)DEV_ID_POWER_NEG) {
+        Arb_CmdListRemove(&arb->allow_fwd, (uint8_t)DEV_ID_POWER_POS);
     }
 }
 

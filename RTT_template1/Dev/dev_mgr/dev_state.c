@@ -154,7 +154,11 @@ void Sys_State_Dispatch(rt_uint32_t bits)
                     (long)(BusVoltage_GetFaultVolt() * 1000.0f),
                     (long)(g_volt_cfg.under_th * 1000.0f));
 #if DEV_ENABLE_PARAM
-        Dev_Param_RodSaveRequest();   /* 欠压边沿请求保存行程（Rod_Task 延时后执行，仅一次） */
+        if (BusVoltage_HasSeenValid() != 0U) {
+            Dev_Param_RodSaveRequest();   /* 欠压边沿请求保存行程（Rod_Task 延时后执行，仅一次） */
+        } else {
+            POWER_PRINT("under volt skip stroke save: no valid bus seen");
+        }
 #endif
         StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_VOLT_UNDER);
     }
@@ -468,7 +472,6 @@ static void sys_enter_emergency(void)
 }
 
 /* EOF */
-
 
 
 

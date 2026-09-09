@@ -19,6 +19,7 @@ volatile uint32_t g_volt_sim_mv = 21500U;   /* 模拟母线电压 mV（VOLT_SIM_
 
 static volatile float   s_fVolt;       /* 1ms ISR 写，主循环/GetInfo 读 */
 static volatile uint8_t s_u8Status;    /* 0 正常 1 欠压 2 过压 */
+static volatile uint8_t s_u8SeenValid; /* 本次 MCU 上电后曾见有效母线（IDLE 复位不清） */
 static uint8_t s_u8Fault;
 static uint8_t s_u8Waiting;
 static uint32_t s_u32RecoverCnt;       /* 恢复延时累计 ms（仅 ISR） */
@@ -49,6 +50,12 @@ void BusVoltage_Isr1ms(void)
     fVolt += (VOL_OFFSET * 0.001f);      /* 偏置补偿：+1.2V（仅本模块，不影响 ADC 层） */
 #endif
     s_fVolt = fVolt;
+
+    /* 有效母线判据与欠压恢复判据一致：高于欠压阈值 + 迟滞（即欠压已退出）。
+       只置 1、不在 IDLE 清零，用于区分"调试无母线冷启动"和"真实掉电"（欠压存行程门控用）。 */
+    if (fVolt > (g_volt_cfg.under_th + g_volt_cfg.hyst)) {
+        s_u8SeenValid = 1U;
+    }
 
     u8PrevFault = s_u8Fault;
 
@@ -102,13 +109,22 @@ void BusVoltage_GetInfo(float *pfVolt_V, uint8_t *pu8Status)
     if (pu8Status != NULL) *pu8Status = s_u8Status;
 }
 
+uint8_t BusVoltage_IsUnderVoltage(void)
+{
+    return (s_u8Status == 1U) ? 1U : 0U;
+}
+
+uint8_t BusVoltage_HasSeenValid(void)
+{
+    return (s_u8SeenValid != 0U) ? 1U : 0U;
+}
+
 float BusVoltage_GetFaultVolt(void)
 {
     return s_fFaultVolt;
 }
 
 /* EOF */
-
 
 
 

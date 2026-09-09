@@ -19,9 +19,9 @@
 <booleanAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.enableSemihostingIoclientGdbClient" value="false"/>
 <booleanAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.enableSemihostingIoclientTelnet" value="true"/>
 <booleanAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.enableSwo" value="false"/>
-<stringAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.eraseEndAddress" value=""/>
-<intAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.eraseMode" value="0"/>
-<stringAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.eraseStartAddress" value=""/>
+<stringAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.eraseEndAddress" value="0x20000"/>
+<intAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.eraseMode" value="2"/>
+<stringAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.eraseStartAddress" value="0"/>
 <intAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.firstResetSpeed" value="1000"/>
 <stringAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.firstResetType" value=""/>
 <stringAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.flashDeviceName" value="HC32F460PETB"/>
@@ -46,7 +46,7 @@
 <stringAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.jlinkExecutable" value="${debugger_install_path}/${jlink_debugger_relative_path}\JLink.exe"/>
 <stringAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.otherInitCommands" value=""/>
 <stringAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.otherRunCommands" value=""/>
-<booleanAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.runAfterDownload" value="false"/>
+<booleanAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.runAfterDownload" value="true"/>
 <stringAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.secondResetType" value=""/>
 <stringAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.serailBaudRate" value="115200"/>
 <stringAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.serailPort" value=""/>
@@ -89,6 +89,6 @@
 <stringAttribute key="org.eclipse.debug.core.source_locator_id" value="org.eclipse.cdt.debug.core.sourceLocator"/>
 <stringAttribute key="org.eclipse.debug.core.source_locator_memento" value="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; standalone=&quot;no&quot;?&gt;&#13;&#10;&lt;sourceLookupDirector&gt;&#13;&#10;&lt;sourceContainers duplicates=&quot;false&quot;&gt;&#13;&#10;&lt;container memento=&quot;&amp;lt;?xml version=&amp;quot;1.0&amp;quot; encoding=&amp;quot;UTF-8&amp;quot; standalone=&amp;quot;no&amp;quot;?&amp;gt;&amp;#13;&amp;#10;&amp;lt;default/&amp;gt;&amp;#13;&amp;#10;&quot; typeId=&quot;org.eclipse.debug.core.containerType.default&quot;/&gt;&#13;&#10;&lt;/sourceContainers&gt;&#13;&#10;&lt;/sourceLookupDirector&gt;&#13;&#10;"/>
 <stringAttribute key="org.eclipse.debug.ui.ATTR_CONSOLE_ENCODING" value="UTF-8"/>
-<stringAttribute key="org.eclipse.dsf.launch.MEMORY_BLOCKS" value="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; standalone=&quot;no&quot;?&gt;&#13;&#10;&lt;memoryBlockExpressionList context=&quot;Context string&quot;/&gt;&#13;&#10;"/>
+<stringAttribute key="org.eclipse.dsf.launch.MEMORY_BLOCKS" value="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; standalone=&quot;no&quot;?&gt;&#13;&#10;&lt;memoryBlockExpressionList context=&quot;Context string&quot;&gt;&#13;&#10;&lt;memoryBlockExpression address=&quot;507904&quot; label=&quot;0x7c000&quot;/&gt;&#13;&#10;&lt;memoryBlockExpression address=&quot;499712&quot; label=&quot;0x7A000&quot;/&gt;&#13;&#10;&lt;memoryBlockExpression address=&quot;491520&quot; label=&quot;0x78000&quot;/&gt;&#13;&#10;&lt;memoryBlockExpression address=&quot;425984&quot; label=&quot;0x68000&quot;/&gt;&#13;&#10;&lt;memoryBlockExpression address=&quot;499712&quot; label=&quot;0x7a000&quot;/&gt;&#13;&#10;&lt;/memoryBlockExpressionList&gt;&#13;&#10;"/>
 <stringAttribute key="process_factory_id" value="org.eclipse.cdt.dsf.gdb.GdbProcessFactory"/>
 </launchConfiguration>

@@ -12,6 +12,7 @@
 #include "dev_model.h"
 #include "dev_state.h"     /* Sys_Event_Send：方向沿 -> EVT_SYS_POLARITY_CHG */
 #include "dev_event_def.h"
+#include "dev_bus_voltage.h"  /* 母线无效/欠压期间，PB15 上拉不是有效方向 */
 #include "drv_gpio.h"          /* GET_PIN / GPIO_PORT_B */
 #include "rtt_manager.h"
 #include "us_timer.h"
@@ -58,6 +59,21 @@ static uint8_t Polarity_WinAllZero(const PolarityWin_t *w)
 static uint8_t Polarity_WinAllOne(const PolarityWin_t *w)
 {
     return (Polarity_WinFull(w) && (w->win == (uint16_t)((1U << POLARITY_WIN_SIZE) - 1U)));
+}
+
+static void Polarity_ResetWindow(void)
+{
+    s_dirWin.win = 0U;
+    s_dirWin.cnt = 0U;
+}
+
+static void Polarity_ForceUnpowered(void)
+{
+    Polarity_ResetWindow();
+    if (s_state != POLARITY_UNPOWERED) {
+        s_state = POLARITY_UNPOWERED;
+        s_u8PendingState = (uint8_t)POLARITY_UNPOWERED;
+    }
 }
 
 /* 极性命令是带数据通道；队列满只告警计数，不阻塞扫描线程 */
@@ -114,6 +130,15 @@ void Polarity_Scan(void)
         return;                     /* UNKNOWN/非法值：保持上次状态，不发事件 */
     }
 #else
+    if (BusVoltage_IsUnderVoltage() != 0U) {
+        /* 单管方向检测依赖 24V：欠压期间 PB15 上拉高不代表 REV，欠压即判掉电；
+           电压恢复（过欠压阈值+迟滞）后清窗重判，必须重新等满 5 点稳定窗口。
+           门控只依赖欠压阈值（Flash 配置）；若配置被改坏，仲裁 RemoveOpposite
+           在重上电极性沿上清除反方向残留兜底。 */
+        Polarity_ForceUnpowered();
+        return;
+    }
+
     uint8_t d;
     d = rt_pin_read(POWER_DIR_PIN) ? 1U : 0U;
 

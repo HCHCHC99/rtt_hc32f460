@@ -8,23 +8,21 @@
  *          停止/急停 = 双低（用户：双低应为刹车态，待实测）。
  */
 #include "dev_gpio_motor.h"
-#include "dev_param.h"      /* MOTOR_GPIO_DIR_INVERT_DEFAULT 存储默认值（单点） */
-#include "rtt_manager.h"
-#include "hc32_drv_gpio.h"
-#include "dev_act.h"
+#include "applications/rtt_manager.h"
+#include "Adp/hc32_drv_gpio.h"
+#include "Dev/dev_act/dev_act.h"
 #include <rtthread.h>
 #include <rthw.h>   /* rt_hw_interrupt_disable / enable */
 
 static uint8_t s_inited = 0U;
-static uint8_t s_dir_invert = MOTOR_GPIO_DIR_INVERT_DEFAULT;    /* 输出转向序：0=标准 1=互换（dev_param 下发） */
+static volatile uint8_t s_dir_invert = 0U;   /* 1=交换 FWD/REV 输出（Flash A 块 motor_dir_seq 应用，Init 不复位） */
 
 /* ===================== 成对写 GPIO（线程/ISR 上下文均可调） ===================== */
 static void MotorGpio_WritePair(uint8_t fwd_en, uint8_t rev_en)
 {
     rt_base_t level = rt_hw_interrupt_disable();
 
-    /* 转向序互换：FWD/REV 命令 ↔ 输出脚映射翻转（stop 双低对称，交换无影响） */
-    if (s_dir_invert != 0U) {
+    if (s_dir_invert != 0U) {                       /* 相序反置：交换 FWD/REV 语义 */
         uint8_t t = fwd_en;
         fwd_en = rev_en;
         rev_en = t;
@@ -71,10 +69,9 @@ static const ArbOutputOps_t s_gpio_out_ops = {
 };
 
 /* ===================== 公开 API ===================== */
-void Dev_MotorGpio_SetDirInvert(uint8_t inv)
+void Dev_MotorGpio_SetDirInvert(uint8_t invert)
 {
-    /* 仅写变量（init 前亦可调：dev_param 上电 apply 早于 IDLE 设备 init） */
-    s_dir_invert = (inv != 0U) ? 1U : 0U;
+    s_dir_invert = (invert != 0U) ? 1U : 0U;
 }
 
 int Dev_MotorGpio_RunFwd(void)
@@ -126,7 +123,7 @@ void Dev_MotorGpio_Init(void)
     (void)Arb_BindOutputOps(&s_gpio_out_ops);
 
     s_inited = 1U;
-    MOTOR_GPIO_PRINT("init gpio fwd/rev pair dirSeq=%u both-low=stop", (unsigned)s_dir_invert);
+    MOTOR_GPIO_PRINT("init gpio fwd/rev pair, both-low=stop");
 }
 
 /* EOF */

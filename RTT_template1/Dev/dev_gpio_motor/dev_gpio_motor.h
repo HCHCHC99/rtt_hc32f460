@@ -20,16 +20,15 @@
 #define MOTOR_GPIO_REV_PORT     (GPIO_PORT_B)   /* PB9 = PH1：反转(缩回) 高有效 */
 #define MOTOR_GPIO_REV_PIN      (GPIO_PIN_09)
 
-/* 输出转向序默认值宏（MOTOR_GPIO_DIR_INVERT_DEFAULT）已集中至
-   Dev/dev_param/dev_param.h（存储默认值单点）；上电由 A 块 motor_dir_seq 下发
-   Dev_MotorGpio_SetDirInvert */
-
-/* ============ API（fwd/rev/stop + EStop + 方向序） ============ */
+/* ============ API（fwd/rev/stop + EStop） ============ */
 void Dev_MotorGpio_Init(void);    /* 注册表 init：两脚输出低（安全态）+ 绑定仲裁输出 ops */
-void Dev_MotorGpio_SetDirInvert(uint8_t inv);  /* 输出转向序：0=标准 1=互换（dev_param 上电下发） */
 int  Dev_MotorGpio_RunFwd(void);  /* 正转（伸出） */
 int  Dev_MotorGpio_RunRev(void);  /* 反转（缩回） */
 int  Dev_MotorGpio_Stop(void);    /* 停止：双低 */
 int  Dev_MotorGpio_EStop(void);   /* 急停：立即双低（ISR 上下文亦可调） */
+
+/* 电机输出相序反置：1=交换 FWD/REV 输出（Flash A 块 motor_dir_seq 上电应用；
+   本 Init 不复位该值，掉电保持由 param 侧负责） */
+void Dev_MotorGpio_SetDirInvert(uint8_t invert);
 
 #endif /* __DEV_GPIO_MOTOR_H__ */
