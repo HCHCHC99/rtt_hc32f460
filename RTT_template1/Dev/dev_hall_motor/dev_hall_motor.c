@@ -21,6 +21,7 @@ typedef struct {
     volatile uint32_t last_pulse_interval;
     volatile uint64_t last_pulse_time_us;
     volatile uint32_t pulse_counter;
+    volatile uint32_t last_calc_pulse_counter;
     volatile uint8_t  speed_data_ready;
     volatile float    current_rpm;
     volatile float    filtered_rpm;
@@ -345,6 +346,37 @@ static void MotorHall_CalculateRpm(MotorHallInst_t *inst)
     }
 }
 
+/* 无新脉冲超过停转时间后，速度不再是“最后一次测量值”，必须显式归零 */
+static void MotorHall_ClearSpeedMeasurement(MotorHallInst_t *inst)
+{
+    uint8_t i;
+
+    inst->current_rpm = 0.0f;
+    inst->filtered_rpm = 0.0f;
+    inst->last_pulse_interval = 0U;
+    inst->speed_data_ready = 0U;
+    inst->is_running = 0U;
+
+    inst->interval_idx = 0U;
+    inst->interval_valid_count = 0U;
+    for (i = 0U; i < 6U; i++) {
+        inst->interval_history[i] = 0U;
+    }
+
+    inst->write_index = 0U;
+    inst->valid_count = 0U;
+    for (i = 0U; i < MOTOR_HALL_RPM_WINDOW_SIZE; i++) {
+        inst->rpm_window[i] = 0.0f;
+    }
+
+    if (inst->current_direction != MOTOR_HALL_DIR_STOP) {
+        inst->current_direction = MOTOR_HALL_DIR_STOP;
+        inst->direction_confidence = 0U;
+        inst->direction_confirm_count = 0U;
+        inst->direction_changed = 1U;
+    }
+}
+
 /* 对应参考 perform_stall_detection（1:1；仅观测，不接错误链路） */
 static void MotorHall_PerformStallDetection(MotorHallInst_t *inst)
 {
@@ -469,6 +501,7 @@ void MotorHall_Init(void)
 
         inst->rpm_last_ms = rt_tick_get_millisecond();
         inst->check_last_ms = inst->rpm_last_ms;
+        inst->last_calc_pulse_counter = 0U;
         inst->last_total = 0U;
         inst->first_run = 1U;
         inst->pulse_accum = 0;
@@ -501,7 +534,18 @@ void MotorHall_Task(void)
         UsTimer_UpdateTimestamp();
 
         if ((now - inst->rpm_last_ms) >= MOTOR_HALL_TASK_PERIOD_MS) {
-            MotorHall_CalculateRpm(inst);
+            uint32_t pulse_snapshot = inst->pulse_counter;
+
+            if (pulse_snapshot != inst->last_calc_pulse_counter) {
+                MotorHall_CalculateRpm(inst);
+                inst->last_calc_pulse_counter = pulse_snapshot;
+            } else {
+                uint64_t time_since_last_pulse = UsTimer_GetTimestampUs() - inst->last_pulse_time_us;
+
+                if (time_since_last_pulse > ((uint64_t)MOTOR_HALL_STOP_DETECTION_MS * 1000UL)) {
+                    MotorHall_ClearSpeedMeasurement(inst);
+                }
+            }
             MotorHall_PerformStallDetection(inst);
             inst->rpm_last_ms = now;
         }
