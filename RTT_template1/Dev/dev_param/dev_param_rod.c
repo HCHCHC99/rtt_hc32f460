@@ -90,10 +90,10 @@ static void Rod_SetDefaults(void)
     (void)memset(&s_rod_record, 0, sizeof(ParamStrokeRecord_t));
     s_rod_record.head_magic = PARAM_ROD_MAGIC_HEAD;
     s_rod_record.tail_magic = PARAM_ROD_MAGIC_TAIL;
-    s_rod_record.position_mm = 0.0f;
+    s_rod_record.position_mm = PARAM_ROD_STROKE_DFT;   /* 行程默认 mm（单点见 dev_param.h） */
 
     s_rod_defaults_written = 1U;
-    PARAM_PRINT("[RODP] defaults set (stroke=0.0mm)");
+    PARAM_PRINT("[RODP] defaults set (stroke dft = PARAM_ROD_STROKE_DFT in dev_param.h)");
 }
 
 /*=============================================================================
@@ -133,15 +133,18 @@ void Dev_Param_RodApply(RodPosition_t *pos)
     /* 注入位置实例引用（欠压保存时 PollSave 取当前位置用；恢复与否都要注入） */
     s_rod_pos_ptr = pos;
 
-    /* 软限位校准窗口（A 块数据）：无论 B 块有效与否都写入——B 无效走首次校准流程
-       时窗口参数同样要就位（判定在 sys_sm 过流分支） */
+    /* 软限位校准窗口 + 停止裕量（A 块数据）：无论 B 块有效与否都写入——B 无效走首次
+       校准流程时这些参数同样要就位（窗口判定在 sys_sm 过流分支，裕量判定在 rod_state） */
     pos->calib_win_a = g_param_record.rod_calib_win_a;
     pos->calib_win_b = g_param_record.rod_calib_win_b;
     pos->calib_win_c = g_param_record.rod_calib_win_c;
     pos->calib_win_d = g_param_record.rod_calib_win_d;
-    PARAM_PRINT("[RODP] calibWin a=%s b=%s c=%s d=%s",
+    pos->stop_margin_mm = g_param_record.rod_stop_margin;
+    Rod_MmFmt(pos->stop_margin_mm, s_mm_a, sizeof(s_mm_a)); /* 借本地缓冲，避开 MmFmtA 4 缓冲轮转上限 */
+    PARAM_PRINT("[RODP] calibWin a=%s b=%s c=%s d=%s stopMargin=%s",
                 Dev_Param_MmFmtA(pos->calib_win_a), Dev_Param_MmFmtA(pos->calib_win_b),
-                Dev_Param_MmFmtA(pos->calib_win_c), Dev_Param_MmFmtA(pos->calib_win_d));
+                Dev_Param_MmFmtA(pos->calib_win_c), Dev_Param_MmFmtA(pos->calib_win_d),
+                s_mm_a);
 
     /* 上电无有效块（默认值路径）：不接管校准，保持原校准流程 */
     if (s_rod_defaults_written != 0U) {

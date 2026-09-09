@@ -15,8 +15,6 @@
 #define DEV_ENABLE_ACT_ARB          1   /* 电机仲裁模块（C 模式：rt_mq + 每轴互斥量 + 仲裁线程） */
 #define DEV_ENABLE_ARB_SELFTEST     0   /* 仲裁台架自测线程（已关闭：输入源由用户经模拟极性自行驱动） */
 #define DEV_ENABLE_MOTOR_GPIO       1   /* 电机 GPIO 输出设备（新板：PB8/PB9 双脚方向控制，双脚高有效） */
-#define DEV_ENABLE_PWM              0   /* 电机 PWM 输出设备（旧板 TMR4 调速；与 DEV_ENABLE_MOTOR_GPIO 互斥，registry 二选一注册） */
-#define DEV_ENABLE_HALL_ROD         0   /* 推杆霍尔设备（限位消抖 + 双高故障沿；0=新板无推杆霍尔，软限位走过流校准链） */
 #define DEV_ENABLE_HALL_MOTOR       1   /* 电机霍尔设备（EXTI 计数 + 测速，观测用） */
 #define DEV_ENABLE_PARAM            1   /* 应用参数管理（Flash 掉电保存 g_volt_cfg/g_cur_cfg，main 上电调 Dev_Param_Init） */
 

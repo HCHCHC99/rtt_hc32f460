@@ -14,12 +14,8 @@ typedef enum {
     POSITION_CALIBRATED,           /* 已建立绝对位置基准 */
 } PositionCalibState_t;
 
-/* 软限位校准窗口默认值（上电无有效 flash A 块时 Init 使用；实际值以 A 块加载、
-   Dev_Param_RodApply 写入为准）。默认 998 依赖默认行程 1000mm，行程变更时同步修改。 */
-#define ROD_CALIB_WIN_A_DFT     (2.0f)    /* 下限窗口下界 a：a<b 时使能区间 [a,b] */
-#define ROD_CALIB_WIN_B_DFT     (2.0f)    /* 下限窗口上界 b：a==b（含 a>b 宽容）时使能 pos<=a（半开） */
-#define ROD_CALIB_WIN_C_DFT     (998.0f)  /* 上限窗口下界 c：c==d（含 c<d 宽容）时使能 pos>=c（半开） */
-#define ROD_CALIB_WIN_D_DFT     (998.0f)  /* 上限窗口上界 d：c>d 时使能区间 [d,c] */
+/* 软限位校准窗口默认值宏（ROD_CALIB_WIN_*_DFT / ROD_STOP_MARGIN_DFT）已集中至
+   Dev/dev_param/dev_param.h（存储默认值单点）；窗口判定语义见下方结构体字段注释 */
 
 /* 推杆位置模块（每轴一个实例） */
 typedef struct {
@@ -45,6 +41,7 @@ typedef struct {
     float                calib_win_b;
     float                calib_win_c;
     float                calib_win_d;
+    float                stop_margin_mm;   /* 停止裕量 mm：位置停车用，pos>=stroke-margin 即合成 AT_MAX（0=无裕量；仅停机决策，不参与校准） */
 } RodPosition_t;
 
 void  RodPosition_Init(RodPosition_t *pos);

@@ -8,6 +8,7 @@
  *          过流事件 ISR 直发 rt_event（ISR 安全），打印在 sys_sm 线程。
  */
 #include "dev_cur_sensor.h"
+#include "Dev/dev_param/dev_param.h"      /* CUR_*_DFT 存储默认值（单点） */
 #include "rtt_manager.h"
 #include "Dev/dev_mgr/dev_state.h"
 #include "Dev/dev_mgr/dev_event_def.h"

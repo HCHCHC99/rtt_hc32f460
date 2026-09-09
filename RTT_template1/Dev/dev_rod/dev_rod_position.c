@@ -3,6 +3,7 @@
  * @brief   推杆位置模块实现：脉冲累加、限位校准、校准区/允许标志管理
  */
 #include "dev_rod_position.h"
+#include "Dev/dev_param/dev_param.h"      /* ROD_CALIB_WIN_*_DFT 存储默认值（单点） */
 
 void RodPosition_Init(RodPosition_t *pos)
 {

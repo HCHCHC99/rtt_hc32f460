@@ -22,10 +22,10 @@
 /* ============ 本地状态 ============ */
 static uint16_t s_tmr4_period = 0U;
 
-/* 组 → OC 单通道映射 {H, L}（OC 接口按单通道寻址；引脚绑定宏见 hc32_drv_pwm.h） */
+/* 组 → OC 单通道映射 {H, L}（OC 接口按单通道寻址：UH=0 UL=1 VH=2 VL=3） */
 static const uint8_t s_grp_oc[2][2] = {
-    { PWM_OC_UH, PWM_OC_UL },   /* 组 U：高/低通道 */
-    { PWM_OC_VH, PWM_OC_VL },   /* 组 V：高/低通道 */
+    { PWM_OC_UH, PWM_OC_UL },   /* 组 U（引脚绑定见 hc32_drv_pwm.h） */
+    { PWM_OC_VH, PWM_OC_VL },   /* 组 V（引脚绑定见 hc32_drv_pwm.h） */
 };
 
 uint16_t PwmHw4_GetPeriod(void)
@@ -41,7 +41,7 @@ uint16_t PwmHw4_DutyToCompare(uint32_t duty_pct)
     return (uint16_t)(((uint32_t)s_tmr4_period + 1U) * duty_pct / 100U);
 }
 
-/* 4 引脚复用到 TIM4_3（功能码/引脚绑定宏见 hc32_drv_pwm.h） */
+/* 4 引脚复用到 TIM4_3（功能码 PWM_GPIO_FUNC_TMR4；引脚绑定见 hc32_drv_pwm.h） */
 static void PwmHw4_GpioInit(void)
 {
     LL_PERIPH_WE(LL_PERIPH_GPIO);

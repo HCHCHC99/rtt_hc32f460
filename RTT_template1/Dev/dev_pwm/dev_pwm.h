@@ -18,6 +18,11 @@
 #define PWM_RAMP_STEP_STOP_PCT  (10U)   /* 停止 ramp 步长 %/10ms（10% → 98→50 约 50ms） */
 #define PWM_TICK_MS             (10U)   /* 调速线程 tick 周期 */
 
+/* ===================== 命令接缝方向值（act/ISR 写 → 调速线程读） ===================== */
+#define PWM_CMD_DIR_STOP        (0U)    /* 停止：U=V=50 + 混合极性 */
+#define PWM_CMD_DIR_FWD         (1U)    /* 正转（伸出） */
+#define PWM_CMD_DIR_REV         (2U)    /* 反转（缩回） */
+
 void Dev_Pwm_Init(void);       /* 注册表 init：硬件初始化 + 调速线程 + 绑定仲裁输出 */
 void Dev_Pwm_Task(void);       /* 兼容预留（ramp 已内化到 pwm 调速线程，本函数为空） */
 int  Dev_PwmMotor_RunFwd(void);    /* 正转（伸出），默认占空比 */

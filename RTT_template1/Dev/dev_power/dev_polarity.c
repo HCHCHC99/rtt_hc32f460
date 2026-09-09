@@ -1,13 +1,16 @@
 /**
  * @file    dev_polarity.c
- * @brief   电源极性设备实现（GPIO 双窗口消抖 + 状态跳变事件）
+ * @brief   电源极性设备实现（单管方向检测 + 滑窗消抖 + 状态跳变事件）
  * @note    由 Task/di_task（2ms 线程）调用，不做打印/阻塞；
- *          事件经 Act_Event_Send 广播到各轴事件组（rt_event_send，ISR 安全），
- *          消费方为电机控制（轴仲裁）模块。
+ *          PB15 单管+上拉：低=FWD 高=REV（真值见 dev_polarity.h）；
+ *          跳变沿发轴事件（Act_Event_Send，ISR 安全）+ 系统事件 EVT_SYS_POLARITY_CHG
+ *          （方向相关故障清除的决策在 dev_state，本模块不感知故障语义）；
+ *          仲裁命令 RUN_FWD/REV @98% 经 Polarity_SendArb（队列满只计数告警）。
  */
 #include "dev_polarity.h"
 #include "Dev/dev_act/dev_act.h"
 #include "Dev/dev_mgr/dev_model.h"
+#include "Dev/dev_mgr/dev_state.h"     /* Sys_Event_Send：方向沿 -> EVT_SYS_POLARITY_CHG */
 #include "Dev/dev_mgr/dev_event_def.h"
 #include "drv_gpio.h"          /* GET_PIN / GPIO_PORT_B */
 #include "rtt_manager.h"
@@ -16,9 +19,9 @@
 #include <rtthread.h>
 #include <rtdevice.h>
 
-/* ============ 引脚与窗口参数 ============ */
+/* ============ 窗口参数 ============ */
 
-/* 双窗口：位掩码（bit0 最新）+ 已填点数 */
+/* 单窗口：位掩码（bit0 最新）+ 已填点数 */
 typedef struct {
     uint16_t win;
     uint8_t  cnt;
@@ -26,8 +29,7 @@ typedef struct {
 
 /* ============ 本地状态 ============ */
 static volatile PolarityState_t s_state = POLARITY_UNKNOWN;
-static PolarityWin_t s_pWin;
-static PolarityWin_t s_nWin;
+static PolarityWin_t s_dirWin;
 static uint8_t s_bInit = 0U;
 static volatile uint8_t s_u8PendingState = 0U;  /* 待打印的跳变状态（ISR 置位，线程清） */
 static volatile uint32_t s_arb_send_fail_count = 0U;
@@ -79,27 +81,20 @@ static void Polarity_SendArb(uint8_t device_id, uint8_t cmd_type, uint8_t duty_p
     }
 }
 
-/* 稳定判定：窗口未满或任一窗口不稳定 -> UNKNOWN（保持上次稳定态） */
+/* 稳定判定：窗口未满或不稳定 -> UNKNOWN（保持上次稳定态）。
+   单管两态：全 0 = FWD（导通低有效），全 1 = REV（截止上拉高） */
 static PolarityState_t Polarity_Eval(void)
 {
-    uint8_t pAll0 = Polarity_WinAllZero(&s_pWin);
-    uint8_t pAll1 = Polarity_WinAllOne(&s_pWin);
-    uint8_t nAll0 = Polarity_WinAllZero(&s_nWin);
-    uint8_t nAll1 = Polarity_WinAllOne(&s_nWin);
-
-    if (pAll0 && nAll0) return POLARITY_UNPOWERED;  /* 掉电 */
-    if (pAll1 && nAll0) return POLARITY_FWD;        /* 正向 */
-    if (pAll0 && nAll1) return POLARITY_REV;        /* 反向 */
-    if (pAll1 && nAll1) return POLARITY_ABNORMAL;   /* 异常 */
-    return POLARITY_UNKNOWN;                        /* 不稳定 */
+    if (Polarity_WinAllZero(&s_dirWin)) return POLARITY_FWD;   /* PB15=0：正向（管子导通） */
+    if (Polarity_WinAllOne(&s_dirWin))  return POLARITY_REV;   /* PB15=1：反向（截止上拉高） */
+    return POLARITY_UNKNOWN;                                   /* 未满窗/抖动 */
 }
 
 /* ============ 接口 ============ */
 void Polarity_Init(void)
 {
     s_state = POLARITY_UNKNOWN;
-    s_pWin.win = 0U; s_pWin.cnt = 0U;
-    s_nWin.win = 0U; s_nWin.cnt = 0U;
+    s_dirWin.win = 0U; s_dirWin.cnt = 0U;
     s_u8PendingState = 0U;
     s_bInit = 1U;
     POLARITY_PRINT("init win=%u", (unsigned)POLARITY_WIN_SIZE);
@@ -119,12 +114,10 @@ void Polarity_Scan(void)
         return;                     /* UNKNOWN/非法值：保持上次状态，不发事件 */
     }
 #else
-    uint8_t p, n;
-    p = rt_pin_read(POWER_DIR_P_PIN) ? 1U : 0U;
-    n = rt_pin_read(POWER_DIR_N_PIN) ? 1U : 0U;
+    uint8_t d;
+    d = rt_pin_read(POWER_DIR_PIN) ? 1U : 0U;
 
-    Polarity_WinPush(&s_pWin, p);
-    Polarity_WinPush(&s_nWin, n);
+    Polarity_WinPush(&s_dirWin, d);
 
     st = Polarity_Eval();
     if (st == POLARITY_UNKNOWN) {
@@ -135,28 +128,21 @@ void Polarity_Scan(void)
         s_state = st;
         s_u8PendingState = (uint8_t)st;   /* 由线程上下文 Polarity_PrintPending 打印 */
         switch (st) {
-        case POLARITY_UNPOWERED:
-            Act_Event_Send(EVT_ACT_POWER_LOST);
-            Polarity_SendArb((uint8_t)DEV_ID_POWER_POS, (uint8_t)CMD_TYPE_CLEAR_ALLOW_FWD, 0U);
-            Polarity_SendArb((uint8_t)DEV_ID_POWER_POS, (uint8_t)CMD_TYPE_CLEAR_ALLOW_REV, 0U);
-            break;
         case POLARITY_FWD:
             Act_Event_Send(EVT_ACT_POLARITY_FWD);
+            Sys_Event_Send(EVT_SYS_POLARITY_CHG);   /* 方向沿通知状态机（故障清除决策在 dev_state） */
             Polarity_SendArb((uint8_t)DEV_ID_POWER_POS,
                              (uint8_t)CMD_TYPE_RUN_FWD,
                              POLARITY_ARB_RUN_DUTY_PCT);
             break;
         case POLARITY_REV:
             Act_Event_Send(EVT_ACT_POLARITY_REV);
+            Sys_Event_Send(EVT_SYS_POLARITY_CHG);   /* 方向沿通知状态机（故障清除决策在 dev_state） */
             Polarity_SendArb((uint8_t)DEV_ID_POWER_NEG,
                              (uint8_t)CMD_TYPE_RUN_REV,
                              POLARITY_ARB_RUN_DUTY_PCT);
             break;
-        case POLARITY_ABNORMAL:
-            Act_Event_Send(EVT_ACT_POWER_ABNORMAL);
-            Polarity_SendArb((uint8_t)DEV_ID_POWER_POS, (uint8_t)CMD_TYPE_CLEAR_ALLOW_FWD, 0U);
-            Polarity_SendArb((uint8_t)DEV_ID_POWER_POS, (uint8_t)CMD_TYPE_CLEAR_ALLOW_REV, 0U);
-            break;
+        /* UNPOWERED/ABNORMAL：单管方案不可达（枚举保留，回退双管方案时恢复分支） */
         default: break;
         }
     }
@@ -194,7 +180,3 @@ PolarityState_t Polarity_GetState(void)
 }
 
 /* EOF */
-
-
-
-

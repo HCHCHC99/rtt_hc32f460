@@ -3,9 +3,7 @@
 
 #include <stdint.h>
 
-/* 默认配置宏（统一放头文件） */
-#define CUR_OVER_CUR_TH_MA_DFT  (5000.0f)  /* 过流阈值默认 mA（5A） */
-#define CUR_OVER_WINDOW_MS_DFT  (50U)      /* 过流判定窗口默认 ms */
+/* 阈值默认值宏（CUR_*_DFT）已集中至 Dev/dev_param/dev_param.h（存储默认值单点） */
 
 /* ===================== 差分放大器换算（0V 零点；总灵敏度=采样电阻×放大倍数） ===================== */
 /* ADC 层 CH6 只输出电压 V，本模块把 V→mA 换算下沉至此（换传感器只改这里） */

@@ -96,7 +96,7 @@ extern "C"
 #define LL_SWDT_ENABLE                              (DDL_ON)
 #define LL_TMR0_ENABLE                              (DDL_ON)
 #define LL_TMR2_ENABLE                              (DDL_ON)
-#define LL_TMR4_ENABLE                              (DDL_ON)
+#define LL_TMR4_ENABLE                              (DDL_ON)   /* TMR4：旧板 PWM 用，dev_pwm 当前未注册不启用（2026-09-09 恢复） */
 #define LL_TMR6_ENABLE                              (DDL_ON)
 #define LL_TMRA_ENABLE                              (DDL_ON)
 #define LL_TRNG_ENABLE                              (DDL_ON)

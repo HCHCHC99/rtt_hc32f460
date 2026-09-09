@@ -40,10 +40,10 @@ typedef enum {
     ROD_EVT_AT_MAX,          /* 到达上限位 */
     ROD_EVT_AT_MIN,          /* 到达下限位 */
     ROD_EVT_TIMEOUT,         /* 运动超时 */
-    ROD_EVT_SENSOR_FAULT,    /* 上下霍尔双高异常（仅 DEV_ENABLE_HALL_ROD=1 有源） */
+    ROD_EVT_SENSOR_FAULT,    /* 传感器异常（预留事件源：现版本无产生方，跳转行保留） */
 } RodEvent_t;
 
-/* 软限位校准请求（sys_sm 过流判定写入，rod_task 消费；新板无推杆霍尔时的判定链） */
+/* 软限位校准请求（sys_sm 过流判定写入，rod_task 消费；过流软限位判定链） */
 typedef enum {
     ROD_CALIB_REQ_NONE = 0,
     ROD_CALIB_REQ_MAX,       /* 过流+伸出：请求上限位校准（重置为行程） */

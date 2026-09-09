@@ -3,6 +3,7 @@
  * @brief   母线电压设备：读 10ms 滑动均值→过压/欠压（迟滞 + 恢复延时，1ms ISR 检测）
  */
 #include "dev_bus_voltage.h"
+#include "Dev/dev_param/dev_param.h"      /* VOL_*_DFT 存储默认值（单点） */
 #include "rtt_manager.h"
 #include "Dev/dev_mgr/dev_state.h"
 #include "Dev/dev_mgr/dev_event_def.h"

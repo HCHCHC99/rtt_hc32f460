@@ -21,9 +21,11 @@
 #include "Dev/dev_power/dev_bus_voltage.h"
 #include "Dev/dev_config.h"
 #include "Dev/dev_param/dev_param.h"
+#include "Dev/dev_rod/dev_rod_calib.h"
 #include <rtthread.h>
 
 static volatile uint32_t s_arb_cmd_send_fail_count = 0U;
+static volatile PolarityState_t s_overcur_dir = POLARITY_UNKNOWN;   /* 过流真故障时的电源方向（方向相关清除用） */
 
 #if DEV_ENABLE_PARAM
 /* 欠压触发的行程保存请求（欠压边沿置位，enter_emergency 刹车后消费，仅一次） */
@@ -100,65 +102,34 @@ void Sys_State_Dispatch(rt_uint32_t bits)
     /* 故障事件：记录故障码后再投递（过压/欠压/过流先进 EMERGENCY，enter 末尾跳 FAULT）；
        检测在 1ms ISR 完成，打印挪到本线程上下文（ISR 不打印） */
     if (bits & EVT_SYS_OVER_CURRENT) {
-        /* 软限位判定：过流（5A/50ms）+ 仲裁输出方向 -> 校准 or 故障
-           - 方向无效/停止：忽略（调试常见，输出已停电流必回落；不进 FAULT）
-           - 伸出+上限窗口使能（或未校准）：请求上限位校准（rod_task 执行，不进 FAULT）
-           - 缩回+下限窗口使能（或未校准）：请求下限位校准
-           - 窗口外（位置记忆在中间）：真故障，走 FAULT（断电清除，无自恢复） */
-        ArbData_t arb;
-        uint8_t arb_dir = DIR_NONE;
-        uint8_t arb_en = 0U;
-        Axis_t *axis = &mySystem.axis[0];
-
-        if (Arb_GetData(0U, &arb) == RT_EOK) {
-            arb_dir = arb.active_dir;
-            arb_en = arb.enable;
+        /* 软限位判定抽至 Dev/dev_rod/dev_rod_calib：
+           CALIB_* = 校准窗口命中/未校准（软限位，不算故障）——本线程即时清对应方向
+           允许（亚毫秒级断电，不等 rod_task 10ms 拍；rod_task 限位态入口再清一次幂等）；
+           FAULT_* = 校准区外（异物卡住）真故障——置过流故障位走 EMERGENCY→FAULT，
+           并记录故障方向供"极性换向清除"（EVT_SYS_POLARITY_CHG 分支） */
+        RodCalibResult_t r = RodCalib_OnOverCurrent(&mySystem.axis[0].position, &mySystem.axis[0].state);
+        if (r == ROD_CALIB_CALIB_MAX) {
+            Sys_State_ArbSendCommand(POLARITY_ARB_AXIS_ID,
+                                     (uint8_t)DEV_ID_POWER_POS,
+                                     (uint8_t)PRIO_POWER,
+                                     (uint8_t)CMD_TYPE_CLEAR_ALLOW_FWD,
+                                     0U,
+                                     RT_TRUE);
+        } else if (r == ROD_CALIB_CALIB_MIN) {
+            Sys_State_ArbSendCommand(POLARITY_ARB_AXIS_ID,
+                                     (uint8_t)DEV_ID_POWER_POS,
+                                     (uint8_t)PRIO_POWER,
+                                     (uint8_t)CMD_TYPE_CLEAR_ALLOW_REV,
+                                     0U,
+                                     RT_TRUE);
+        } else if ((r == ROD_CALIB_FAULT_FWD) || (r == ROD_CALIB_FAULT_REV)) {
+            s_overcur_dir = (r == ROD_CALIB_FAULT_FWD) ? POLARITY_FWD : POLARITY_REV;
+            mySystem.error_code = SYS_ERR_OVER_CURRENT;
+            if (mySystem.fault_bits == 0U) { mySystem.prev_state = (State_t)StateMachine_GetState(&mySystem.sys_sm); }
+            mySystem.fault_bits |= (1U << 0);   /* 过流故障置位 */
+            StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_OVER_CURRENT);
         }
-        if ((arb_en == 0U) || (arb_dir != DIR_FWD && arb_dir != DIR_REV)) {
-            POWER_PRINT("over curr ignored dir=%u en=%u ma=%ld th=%ld win=%ums",
-                        (unsigned)arb_dir, (unsigned)arb_en,
-                        (long)CurrentSensor_GetFaultMa(),
-                        (long)g_cur_cfg.over_th_ma,
-                        (unsigned)g_cur_cfg.window_ms);
-        } else if (arb_dir == DIR_FWD) {
-            /* 伸出中过流：上限窗口使能（或未校准首次）-> 判上限位校准；窗口外 -> 故障 */
-            if (!RodPosition_IsCalibrated(&axis->position) ||
-                RodPosition_IsInCalibZoneMax(&axis->position)) {
-                axis->state.calib_req = ROD_CALIB_REQ_MAX;
-                POWER_PRINT("over curr FWD -> calib req MAX ma=%ld th=%ld win=%ums",
-                            (long)CurrentSensor_GetFaultMa(),
-                            (long)g_cur_cfg.over_th_ma,
-                            (unsigned)g_cur_cfg.window_ms);
-            } else {
-                POWER_PRINT("over curr FAULT FWD ma=%ld th=%ld win=%ums (pos out of calibWin)",
-                            (long)CurrentSensor_GetFaultMa(),
-                            (long)g_cur_cfg.over_th_ma,
-                            (unsigned)g_cur_cfg.window_ms);
-                mySystem.error_code = SYS_ERR_OVER_CURRENT;
-                if (mySystem.fault_bits == 0U) { mySystem.prev_state = (State_t)StateMachine_GetState(&mySystem.sys_sm); }
-                mySystem.fault_bits |= (1U << 0);   /* 过流故障置位 */
-                StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_OVER_CURRENT);
-            }
-        } else {
-            /* 缩回中过流：下限窗口使能（或未校准首次）-> 判下限位校准；窗口外 -> 故障 */
-            if (!RodPosition_IsCalibrated(&axis->position) ||
-                RodPosition_IsInCalibZoneMin(&axis->position)) {
-                axis->state.calib_req = ROD_CALIB_REQ_MIN;
-                POWER_PRINT("over curr REV -> calib req MIN ma=%ld th=%ld win=%ums",
-                            (long)CurrentSensor_GetFaultMa(),
-                            (long)g_cur_cfg.over_th_ma,
-                            (unsigned)g_cur_cfg.window_ms);
-            } else {
-                POWER_PRINT("over curr FAULT REV ma=%ld th=%ld win=%ums (pos out of calibWin)",
-                            (long)CurrentSensor_GetFaultMa(),
-                            (long)g_cur_cfg.over_th_ma,
-                            (unsigned)g_cur_cfg.window_ms);
-                mySystem.error_code = SYS_ERR_OVER_CURRENT;
-                if (mySystem.fault_bits == 0U) { mySystem.prev_state = (State_t)StateMachine_GetState(&mySystem.sys_sm); }
-                mySystem.fault_bits |= (1U << 0);   /* 过流故障置位 */
-                StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_OVER_CURRENT);
-            }
-        }
+        /* ROD_CALIB_IGNORED：无动作 */
     }
     if (bits & EVT_SYS_ROD_LIMIT_FAULT) {
         mySystem.error_code = SYS_ERR_ROD_LIMIT;
@@ -229,6 +200,32 @@ void Sys_State_Dispatch(rt_uint32_t bits)
                     (long)(g_volt_cfg.hyst * 1000.0f),
                     (unsigned)g_volt_cfg.recover_ms);
     }
+    /* 电源极性跳变沿（事件源 dev_polarity；故障清除决策在本状态机层，极性模块不知故障）：
+       过流真故障（校准区外异物卡住）是"方向相关"的——用户断电后换方向给电（船型开关快切，
+       MCU 未复位仍记忆旧方向 EMERGENCY）= 新工作周期重试意图 -> 清过流故障位并恢复；
+       新方向 == 故障方向则不清（同方向再给电 = 仍堵转，保持 FAULT 保护）。
+       电压位不由本分支清（VOLT_NORMAL + 恢复延时负责）；清后全 0 才发 RECOVERY，
+       prev==RUN 补 WORK_ENABLE -> enter_run 的 ResyncActFromFault 按当前极性重发 RUN 命令 */
+    if (bits & EVT_SYS_POLARITY_CHG) {
+        PolarityState_t cur = Polarity_GetState();
+        if (((mySystem.fault_bits & (1U << 0)) != 0U) &&
+            (s_overcur_dir != POLARITY_UNKNOWN) &&
+            (cur != s_overcur_dir)) {
+            POWER_PRINT("polarity dir=%u != overcur dir=%u, clear overcurrent fault",
+                        (unsigned)cur, (unsigned)s_overcur_dir);
+            mySystem.fault_bits &= ~(1U << 0);
+            if (mySystem.fault_bits == 0U) {
+                mySystem.error_code = SYS_ERR_NONE;
+                StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_RECOVERY);
+                if (mySystem.prev_state == (State_t)SYS_STATE_RUN) {
+                    StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_CMD_WORK_ENABLE);
+                }
+            } else {
+                POWER_PRINT("overcur cleared, remain=0x%02X wait volt normal",
+                            (unsigned)mySystem.fault_bits);
+            }
+        }
+    }
     if (bits & EVT_SYS_INIT_DONE)     StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_INIT_DONE);
     if (bits & EVT_SYS_CMD_WORK_ENABLE) StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_CMD_WORK_ENABLE);
     if (bits & EVT_SYS_ST_WORK_ERROR) StateMachine_SendEvent(&mySystem.sys_sm, EVT_SYS_ST_WORK_ERROR);
@@ -271,6 +268,7 @@ void Sys_EventBitsName(rt_uint32_t bits, char *buf, rt_uint32_t size)
         {EVT_SYS_ROD_LIMIT_FAULT, "ROD_LIMIT_FAULT"},
         {EVT_SYS_ST_WORK_ERROR,   "ST_WORK_ERROR"},
         {EVT_SYS_VOLT_RECOVER_WAIT, "VOLT_RECOVER_WAIT"},
+        {EVT_SYS_POLARITY_CHG,    "POLARITY_CHG"},
     };
     rt_uint32_t i;
     rt_uint32_t pos = 0U;
@@ -435,8 +433,9 @@ static void sys_enter_fault(void)
     UsTimer_UpdateTimestamp();
     SYS_STATE_PRINT("enter FAULT code=%u t=%uus", (unsigned)mySystem.error_code, (unsigned)UsTimer_GetTimestampUs());
     for (i = 0; i < MAX_AXIS_NUM; i++) {
+        /* FAULT 稳态锁死：禁使能 + 再发一次急停（与 enter_emergency 幂等重复，
+           同时覆盖 IDLE/RUN 直入 FAULT（不经 EMERGENCY）的路径，勿删） */
         Sys_State_SetArbEnable((uint8_t)i, RT_FALSE);
-        /* 直入 FAULT（不经 EMERGENCY）时也必须停硬件输出：清允许并触发决策 */
         Sys_State_ArbSendCommand((uint8_t)i,
                                  (uint8_t)DEV_ID_EMERGENCY,
                                  (uint8_t)PRIO_EMERGENCY,
@@ -450,7 +449,9 @@ static void sys_enter_emergency(void)
     int i;
     UsTimer_UpdateTimestamp();
     SYS_STATE_PRINT("enter EMERGENCY code=%u t=%uus", (unsigned)mySystem.error_code, (unsigned)UsTimer_GetTimestampUs());
-    /* 急停动作：全轴制动（多轴预留） */
+    /* 急停动作：全轴制动（多轴预留）。
+       此处与 enter_fault 的急停命令构成 at-least-once 安全冗余：本入口是"瞬断"，
+       FAULT 稳态会再发一次（幂等，仲裁端最高优先级锁存），勿删任一处 */
     for (i = 0; i < MAX_AXIS_NUM; i++) {
         (void)rt_event_send(mySystem.axis[i].evt_act, EVT_ACT_HOLD);
         Sys_State_ArbSendCommand((uint8_t)i,

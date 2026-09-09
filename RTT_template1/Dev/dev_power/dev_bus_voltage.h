@@ -3,12 +3,7 @@
 
 #include <stdint.h>
 
-/* 默认配置宏（统一放头文件） */
-#define VOL_OVER_TH_DFT          (26.0f)   /* 过压阈值默认 V */
-
-#define VOL_UNDER_TH_DFT         (-5.0f)    /* 欠压阈值默认 V */
-#define VOL_HYST_DFT             (1.0f)    /* 迟滞回差默认 V（1V） */
-#define VOL_RECOVER_DELAY_MS_DFT (500U)    /* 恢复延时默认 ms */
+/* 阈值默认值宏（VOL_*_DFT）已集中至 Dev/dev_param/dev_param.h（存储默认值单点） */
 #define VOL_OFFSET               (1200.0f) /* 偏置电压 mV：1200mV = 1.2V */
 
 /* ===================== 模拟模式 ===================== */

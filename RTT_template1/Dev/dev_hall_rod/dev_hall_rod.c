@@ -1,6 +1,6 @@
 /**
  * @file    dev_hall_rod.c
- * @brief   推杆霍尔设备实现（GPIO 双窗口消抖 + 双高故障沿）
+ * @brief   推杆霍尔设备实现（GPIO 双窗口消抖 + 双低故障沿）
  * @note    仿 dev_polarity 窗口机制；不做打印/阻塞（Scan 由 rod_task 线程调用）。
  */
 #include "dev_hall_rod.h"
@@ -18,13 +18,13 @@ typedef struct {
 
 static RodHallWin_t s_maxWin;
 static RodHallWin_t s_minWin;
-static RodHallWin_t s_ftWin;        /* 双高窗口：输入 = max_raw & min_raw */
+static RodHallWin_t s_ftWin;        /* 双低窗口：输入 = !(max_raw | min_raw) */
 static bool s_atMax;
 static bool s_atMin;
 static bool s_fault;
 static uint8_t s_bInit = 0U;
 
-/* Watch 观测：bit0=上限位 bit1=下限位 bit2=双高故障 */
+/* Watch 观测：bit0=上限位 bit1=下限位 bit2=双低故障 */
 volatile uint8_t g_rodhall_dbg = 0U;
 
 static void RodHall_WinPush(RodHallWin_t *w, uint8_t bit)
@@ -56,7 +56,7 @@ void RodHall_Init(void)
     s_fault = false;
     g_rodhall_dbg = 0U;
     s_bInit = 1U;
-    HALL_ROD_PRINT("init win=%u max/min high=trigger", (unsigned)ROD_HALL_WIN_SIZE);
+    HALL_ROD_PRINT("init win=%u", (unsigned)ROD_HALL_WIN_SIZE);
 }
 
 void RodHall_Scan(void)

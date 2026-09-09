@@ -31,12 +31,12 @@
 |---|---|---|---|
 | PC14 | 极性检测 P | `POLARITY_SIM_MODE_EN=1` 模拟模式：Init/Scan 不碰 GPIO，与霍尔 B 同脚无运行时冲突 | Dev/dev_power/dev_polarity.h:13（`POWER_DIR_P_PIN`）、35（模拟开关） |
 | PC15 | 极性检测 N | 同上（新板真实极性脚为 PB15：正接低/反接高，暂不启用） | Dev/dev_power/dev_polarity.h:14（`POWER_DIR_N_PIN`） |
-| PB2 | 推杆霍尔上限位（旧板） | `DEV_ENABLE_HALL_ROD=0`：模块不注册、引脚不配置；软限位改走过流校准链 | Dev/dev_hall_rod/dev_hall_rod.h:14（`ROD_HALL_MAX_PIN`）、dev_config.h:19 |
+| PB2 | 推杆霍尔上限位（旧板） | 代码保留未启用（2026-09-09 从 v1.0.1 移植回）：dev_hall_rod 已编译但未注册；新板软限位走过流校准链 | Dev/dev_hall_rod/dev_hall_rod.h:14（`ROD_HALL_MAX_PIN`） |
 | PB10 | 推杆霍尔下限位（旧板） | 同上 | Dev/dev_hall_rod/dev_hall_rod.h:15（`ROD_HALL_MIN_PIN`） |
-| PB6 | 旧板 PWM TIM4_3_OVL | `DEV_ENABLE_PWM=0`：dev_pwm.c 整文件编译排除，TMR4 不初始化 | Adp/hc32_drv_pwm.h:46-47（`PWM_OVL_*`）、dev_config.h:18 |
+| PB6 | 旧板 PWM TIM4_3_OVL | 代码保留未启用（2026-09-09 从 v1.0.1 移植回）：dev_pwm / hc32_drv_pwm 已编译但未注册（TMR4 不初始化，无引脚配置） | Adp/hc32_drv_pwm.h:46-47（`PWM_OVL_*`） |
 | PB7 | 旧板 PWM TIM4_3_OVH | 同上 | Adp/hc32_drv_pwm.h:44-45（`PWM_OVH_*`） |
-| PB8 | 旧板 PWM TIM4_3_OUL | 同上（与电机 GPIO 互斥：registry #if/#elif 二选一注册） | Adp/hc32_drv_pwm.h:42-43（`PWM_OUL_*`） |
-| PB9 | 旧板 PWM TIM4_3_OUH | 同上 | Adp/hc32_drv_pwm.h:40-41（`PWM_OUH_*`） |
+| PB8 | 旧板 PWM TIM4_3_OUL | 同上（FA04A 该脚现为电机控制 PL1，见第一部分；启用 dev_pwm 前先解决引脚冲突） | Adp/hc32_drv_pwm.h:42-43（`PWM_OUL_*`） |
+| PB9 | 旧板 PWM TIM4_3_OUH | 同上（FA04A 该脚现为电机控制 PH1，见第一部分） | Adp/hc32_drv_pwm.h:40-41（`PWM_OUH_*`） |
 
 ## 三、代码中定义但未使用的宏（注意勿误启用）
 
@@ -60,5 +60,5 @@
 
 1. ADC（电压/电流）：只改 Adp/hc32_drv_adc.h:107-115 四宏一组（通道号+DDL 枚举+端口+引脚），dev_adc.c 已引用宏
 2. 电机霍尔：只改 Dev/dev_hall_motor/dev_hall_motor.h:18-29（端口/引脚/EXTI/IRQ/EIRQ 成组）
-3. 电机输出（GPIO）：只改 Dev/dev_gpio_motor/dev_gpio_motor.h:20-23；回退旧板 PWM 改 dev_config.h 两开关
+3. 电机输出（GPIO）：只改 Dev/dev_gpio_motor/dev_gpio_motor.h:20-23；旧板 PWM/推杆霍尔回退路径的代码已于 2026-09-08 删除（dev_pwm、dev_hall_rod、hc32_drv_pwm 模块及 DEV_ENABLE_PWM/DEV_ENABLE_HALL_ROD 开关均已移除），如需旧板方案请从版本历史恢复
 4. 极性：启用真实检测需改 dev_polarity.h:35 `POLARITY_SIM_MODE_EN=0`（注意 PC14 与霍尔 B 冲突，FA04A 真实脚在 PB15，需同步改 13-14 行宏）

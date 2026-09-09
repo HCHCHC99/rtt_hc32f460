@@ -20,8 +20,9 @@
 #define EVT_SYS_CMD_WORK_ENABLE        (1U << 7)    /* 系统工作：使能 */
 #define EVT_SYS_OVER_CURRENT          (1U << 8)    /* 过流 */
 #define EVT_SYS_ROD_LIMIT_FAULT        (1U << 9)    /* 推杆上下霍尔故障（双高异常） */
-#define EVT_SYS_ST_WORK_ERROR          (1U << 13)   /* 系统工作：工作错误 */
 #define EVT_SYS_VOLT_RECOVER_WAIT      (1U << 10)   /* 电压回到正常区，开始等恢复延时（dev_bus_voltage ISR 发） */
+#define EVT_SYS_POLARITY_CHG           (1U << 11)   /* 电源极性跳变沿（dev_polarity 发；决策在 dev_state：方向相关清过流故障） */
+#define EVT_SYS_ST_WORK_ERROR          (1U << 13)   /* 系统工作：工作错误 */
 
 /* ===================== 轴事件组（多轴预留） ===================== */
 #define EVT_ACT_WORK_ENABLE            (1U << 0)    /* 推杆工作使能 */
@@ -42,6 +43,6 @@
     (EVT_SYS_INIT_DONE | EVT_SYS_CMD_WORK_ENABLE | EVT_SYS_FAULT | EVT_SYS_EMERGENCY | \
      EVT_SYS_RECOVERY | EVT_SYS_VOLT_OVER | EVT_SYS_VOLT_UNDER | EVT_SYS_VOLT_NORMAL | \
      EVT_SYS_OVER_CURRENT | EVT_SYS_ROD_LIMIT_FAULT | EVT_SYS_ST_WORK_ERROR | \
-     EVT_SYS_VOLT_RECOVER_WAIT)
+     EVT_SYS_VOLT_RECOVER_WAIT | EVT_SYS_POLARITY_CHG)
 
 

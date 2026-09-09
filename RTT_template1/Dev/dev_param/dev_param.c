@@ -11,6 +11,8 @@
 #include "Dev/dev_config.h"
 #include "Dev/dev_power/dev_bus_voltage.h"
 #include "Dev/dev_power/dev_cur_sensor.h"
+#include "Dev/dev_hall_motor/dev_hall_motor.h"   /* g_mothall_invert_dir（extern 声明） */
+#include "Dev/dev_gpio_motor/dev_gpio_motor.h"   /* Dev_MotorGpio_SetDirInvert（函数声明） */
 #include "Dev/dev_act/dev_act.h"
 #include <stddef.h>
 #include <string.h>
@@ -96,23 +98,27 @@ static void Param_SetDefaults(void)
 
     g_param_record.cur_over_th_ma = CUR_OVER_CUR_TH_MA_DFT;
     g_param_record.cur_window_ms  = (uint16_t)CUR_OVER_WINDOW_MS_DFT;
-    g_param_record.reserved       = 0U;
+    /* 方向序（原 reserved 字节拆分，旧记录该区=0 恰为默认标准方向） */
+    g_param_record.hall_dir_seq  = MOTOR_HALL_DIRECTION_INVERT_DEFAULT;
+    g_param_record.motor_dir_seq = MOTOR_GPIO_DIR_INVERT_DEFAULT;
 
     g_param_record.rod_calib_win_a = ROD_CALIB_WIN_A_DFT;
     g_param_record.rod_calib_win_b = ROD_CALIB_WIN_B_DFT;
     g_param_record.rod_calib_win_c = ROD_CALIB_WIN_C_DFT;
     g_param_record.rod_calib_win_d = ROD_CALIB_WIN_D_DFT;
+    g_param_record.rod_stop_margin = ROD_STOP_MARGIN_DFT;
 
     Param_VoltFmt(VOL_OVER_TH_DFT, s_volt_a, sizeof(s_volt_a));
     Param_VoltFmt(VOL_UNDER_TH_DFT, s_volt_b, sizeof(s_volt_b));
     Param_VoltFmt(VOL_HYST_DFT, s_volt_c, sizeof(s_volt_c));
-    PARAM_PRINT("[PARAM] defaults set: over=%sV under=%sV hyst=%sV rec=%lums cur=%lumA win=%ums calibWin=%s/%s/%s/%s",
+    PARAM_PRINT("[PARAM] defaults set: over=%sV under=%sV hyst=%sV rec=%lums cur=%lumA win=%ums calibWin=%s/%s/%s/%s dirSeq=%u/%u",
                 s_volt_a, s_volt_b, s_volt_c,
                 (unsigned long)VOL_RECOVER_DELAY_MS_DFT,
                 (unsigned long)(CUR_OVER_CUR_TH_MA_DFT + 0.5f),
                 (unsigned)CUR_OVER_WINDOW_MS_DFT,
                 Dev_Param_MmFmtA(ROD_CALIB_WIN_A_DFT), Dev_Param_MmFmtA(ROD_CALIB_WIN_B_DFT),
-                Dev_Param_MmFmtA(ROD_CALIB_WIN_C_DFT), Dev_Param_MmFmtA(ROD_CALIB_WIN_D_DFT));
+                Dev_Param_MmFmtA(ROD_CALIB_WIN_C_DFT), Dev_Param_MmFmtA(ROD_CALIB_WIN_D_DFT),
+                (unsigned)MOTOR_HALL_DIRECTION_INVERT_DEFAULT, (unsigned)MOTOR_GPIO_DIR_INVERT_DEFAULT);
 }
 
 /**
@@ -127,6 +133,12 @@ static void Param_ApplyToDevices(void)
 
     g_cur_cfg.over_th_ma = g_param_record.cur_over_th_ma;
     g_cur_cfg.window_ms  = g_param_record.cur_window_ms;
+
+    /* 方向序下发：hall ISR 读 g_mothall_invert_dir；gpio ops 读内部 s_dir_invert。
+       两设备 Init 均不覆盖这两个值（hall Init 只复位业务态 / gpio Init 跳过重入），
+       本函数在 main 阶段调用（早于 IDLE 设备 init），下发后全程有效 */
+    g_mothall_invert_dir = g_param_record.hall_dir_seq;
+    Dev_MotorGpio_SetDirInvert(g_param_record.motor_dir_seq);
 }
 
 /**
@@ -163,7 +175,7 @@ int32_t Dev_Param_Init(void)
         Param_VoltFmt(g_param_record.volt_over_th, s_volt_a, sizeof(s_volt_a));
         Param_VoltFmt(g_param_record.volt_under_th, s_volt_b, sizeof(s_volt_b));
         Param_VoltFmt(g_param_record.volt_hyst, s_volt_c, sizeof(s_volt_c));
-        PARAM_PRINT("[PARAM] loaded: over=%sV under=%sV hyst=%sV rec=%lums cur=%lumA win=%ums calibWin=%s/%s/%s/%s (seq=%lu)",
+        PARAM_PRINT("[PARAM] loaded: over=%sV under=%sV hyst=%sV rec=%lums cur=%lumA win=%ums calibWin=%s/%s/%s/%s dirSeq=%u/%u (seq=%lu)",
                     s_volt_a, s_volt_b, s_volt_c,
                     (unsigned long)g_param_record.volt_recover_ms,
                     (unsigned long)(g_param_record.cur_over_th_ma + 0.5f),
@@ -172,6 +184,8 @@ int32_t Dev_Param_Init(void)
                     Dev_Param_MmFmtA(g_param_record.rod_calib_win_b),
                     Dev_Param_MmFmtA(g_param_record.rod_calib_win_c),
                     Dev_Param_MmFmtA(g_param_record.rod_calib_win_d),
+                    (unsigned)g_param_record.hall_dir_seq,
+                    (unsigned)g_param_record.motor_dir_seq,
                     (unsigned long)g_param_record.sequence_id);
     } else {
         MAIN_D("[PARAM] init FAILED res=%d (keep RAM defaults)", (int)res);
@@ -286,11 +300,15 @@ static void cmd_param_show(void)
            s_volt_a, s_volt_b, s_volt_c, (unsigned long)g_volt_cfg.recover_ms);
     MAIN_D("[PARAM] cur: over=%lumA win=%ums",
            (unsigned long)(g_cur_cfg.over_th_ma + 0.5f), (unsigned)g_cur_cfg.window_ms);
-    MAIN_D("[PARAM] rod calibWin: a=%s b=%s c=%s d=%s",
+    Param_VoltFmt(g_param_record.rod_stop_margin, s_volt_a, sizeof(s_volt_a)); /* 借电压缓冲（同 MmFmtA 格式，避开 4 缓冲轮转上限） */
+    MAIN_D("[PARAM] rod calibWin: a=%s b=%s c=%s d=%s stopMargin=%s",
            Dev_Param_MmFmtA(g_param_record.rod_calib_win_a),
            Dev_Param_MmFmtA(g_param_record.rod_calib_win_b),
            Dev_Param_MmFmtA(g_param_record.rod_calib_win_c),
-           Dev_Param_MmFmtA(g_param_record.rod_calib_win_d));
+           Dev_Param_MmFmtA(g_param_record.rod_calib_win_d),
+           s_volt_a);
+    MAIN_D("[PARAM] dirSeq: hall=%u motor=%u (0=std 1=inv; hall=A-high-is-fwd, motor=FWD-out-is-fwd)",
+           (unsigned)g_param_record.hall_dir_seq, (unsigned)g_param_record.motor_dir_seq);
     MAIN_D("[PARAM] runtime: sec=%u addr=0x%08lX saves=%lu last_res=%d",
            (unsigned)s_param_runtime.curr_sec, (unsigned long)s_param_runtime.curr_addr,
            (unsigned long)s_param_runtime.save_count, (int)s_param_runtime.last_res);
@@ -314,5 +332,34 @@ static void cmd_param_erase(void)
     MAIN_D("[PARAM] erased & re-inited with defaults");
 }
 MSH_CMD_EXPORT_ALIAS(cmd_param_erase, param_erase, erase all param sectors & reset defaults);
+
+/* dir_set <hall 0/1> <motor 0/1>：改方向序 + 立即应用 + 保存（电机运行中仅应用不保存） */
+static uint8_t Dir_Parse01(const char *s)
+{
+    return ((s != RT_NULL) && (s[0] == '1')) ? 1U : 0U;
+}
+
+static void cmd_dir_set(int argc, char *argv[])
+{
+    if (argc < 3) {
+        MAIN_D("usage: dir_set <hall 0/1> <motor 0/1>  (0=std 1=inv)");
+        return;
+    }
+
+    g_param_record.hall_dir_seq  = Dir_Parse01(argv[1]);
+    g_param_record.motor_dir_seq = Dir_Parse01(argv[2]);
+
+    /* 立即应用到设备（hall ISR / gpio ops 下一命令即按新方向执行） */
+    g_mothall_invert_dir     = g_param_record.hall_dir_seq;
+    Dev_MotorGpio_SetDirInvert(g_param_record.motor_dir_seq);
+
+    if (Dev_Param_Save() == PARAM_OK) {
+        MAIN_D("[PARAM] dir set & saved: hall=%u motor=%u",
+               (unsigned)g_param_record.hall_dir_seq, (unsigned)g_param_record.motor_dir_seq);
+    } else {
+        MAIN_D("[PARAM] dir applied (RAM only, save refused - stop motor then param_save)");
+    }
+}
+MSH_CMD_EXPORT_ALIAS(cmd_dir_set, dir_set, set hall/motor dir seq 0/1 & save);
 
 #endif /* DEV_ENABLE_PARAM */

@@ -17,7 +17,7 @@ static const struct dev_adc_ops *g_adc_ops = NULL;
 /* 通道配置表（只含换算；通道号/端口/引脚绑定宏在 Adp/hc32_drv_adc.h，
    id 序 = 表序：id0=电压、id1=电流，Dev_Adc_GetLatest 按此取值，勿换行序） */
 static const dev_adc_ch_cfg_t s_astcChTable[] = {
-    { ADC_DRV_VOLT_CH,  16.0f, 0.0f, false },   /* 电压：gain=16 = 150k:10k 分压，满量程 52.8V */
+    { ADC_DRV_VOLT_CH,  31.3f, 0.0f, false },   /* 电压：gain=31.303 = 100k:3.3k 分压 */
     { ADC_DRV_CUR_CH,    1.0f, 0.0f, false },   /* 电流：gain=1，ADC 层仅出电压 V，V→mA 换算在 dev_cur_sensor */
 };
 

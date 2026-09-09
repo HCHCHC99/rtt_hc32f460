@@ -7,10 +7,6 @@
 #include "Dev/dev_mgr/dev_model.h"       /* mySystem / Act_Event_Send */
 #include "Dev/dev_mgr/dev_event_def.h"
 #include "Dev/dev_act/dev_act.h"         /* Arb_SendCommand: 限位清允许命令 */
-#include "Dev/dev_config.h"
-#if DEV_ENABLE_HALL_ROD
-#include "Dev/dev_hall_rod/dev_hall_rod.h" /* 限位/故障稳态源（推杆霍尔设备，旧板） */
-#endif
 #include "applications/rtt_manager.h"
 #include <rtthread.h>
 
@@ -85,35 +81,29 @@ void RodState_Init(StateMachine_t *sm, RodStateCtx_t *ctx, uint8_t axis_id, cons
     ctx->limit_reach_count = 0U;
 }
 
-/* 事件合成：优先级 传感器异常 > 限位 > 超时 > 方向指令
-   限位源二选一：DEV_ENABLE_HALL_ROD=1 推杆霍尔稳态（旧板）；
-                =0 软限位校准请求（sys_sm 过流判定写入，rod_task 消费） */
+/* 事件合成：优先级 限位 > 超时 > 方向指令
+   限位源：软限位校准请求（sys_sm 过流判定写入，rod_task 消费） */
 static RodEvent_t RodState_SynthesizeEvent(const RodStateCtx_t *ctx, RodState_t st,
                                            RodDirection_t dir, uint32_t tick)
 {
-#if DEV_ENABLE_HALL_ROD
-    bool at_max = RodHall_IsAtMax();
-    bool at_min = RodHall_IsAtMin();
-
-    if (RodHall_IsFault()) {
-        return ROD_EVT_SENSOR_FAULT;
-    }
-    if (at_max && (st == ROD_STATE_UNKNOWN || st == ROD_STATE_STOPPED ||
-                   st == ROD_STATE_EXTENDING || st == ROD_STATE_EXT_LIMIT)) {
-        return ROD_EVT_AT_MAX;
-    }
-    if (at_min && (st == ROD_STATE_UNKNOWN || st == ROD_STATE_STOPPED ||
-                   st == ROD_STATE_RETRACTING || st == ROD_STATE_RET_LIMIT)) {
-        return ROD_EVT_AT_MIN;
-    }
-#else
     if (ctx->calib_req == ROD_CALIB_REQ_MAX) {
         return ROD_EVT_AT_MAX;
     }
     if (ctx->calib_req == ROD_CALIB_REQ_MIN) {
         return ROD_EVT_AT_MIN;
     }
-#endif
+    /* 位置停车（与板无关）：位置已校准且到达"行程-停止裕量"即合成 AT_MAX，不再依赖过流。
+       仅停机决策：绝不写 calib_state/calib_pending/position_mm（校准只由过流触发，不做钳位）。
+       状态门与过流校准路径的 AT_MAX 一致（跳转表 UNKNOWN/STOPPED/EXTENDING 均有对应行，
+       EXT_LIMIT 本身无行即驻留）；calib_req（过流）路径优先级保持在前。 */
+    if ((ctx->position != NULL) &&
+        (ctx->position->calib_state == POSITION_CALIBRATED) &&
+        (ctx->position->position_mm >=
+         (ctx->position->stroke_mm - ctx->position->stop_margin_mm)) &&
+        (st == ROD_STATE_UNKNOWN || st == ROD_STATE_STOPPED ||
+         st == ROD_STATE_EXTENDING || st == ROD_STATE_EXT_LIMIT)) {
+        return ROD_EVT_AT_MAX;
+    }
     if ((st == ROD_STATE_EXTENDING || st == ROD_STATE_RETRACTING) &&
         ctx->move_timeout_ms != 0U && (tick - ctx->move_start_tick) >= ctx->move_timeout_ms) {
         return ROD_EVT_TIMEOUT;
@@ -134,7 +124,7 @@ void RodState_Update(StateMachine_t *sm, RodStateCtx_t *ctx, RodDirection_t dir,
     evt = RodState_SynthesizeEvent(ctx, prev, dir, tick);
     StateMachine_SendEvent(sm, (Event_t)evt);
     cur = (RodState_t)StateMachine_GetState(sm);
-    ctx->calib_req = ROD_CALIB_REQ_NONE;   /* 校准请求一次性消费（hall 版恒 NONE 无影响） */
+    ctx->calib_req = ROD_CALIB_REQ_NONE;   /* 校准请求一次性消费 */
 
     /* ---- 状态侧效应（按跳变处理） ---- */
     if (cur == ROD_STATE_EXTENDING) {
@@ -160,7 +150,9 @@ void RodState_Update(StateMachine_t *sm, RodStateCtx_t *ctx, RodDirection_t dir,
             ctx->limit_reach_count++;
             if (!ctx->limit_ext_sent) {
                 Act_Event_Send(EVT_ROD_LIMIT_EXTEND); /* 到上限位 -> 通知仲裁 */
-                /* 清伸出允许：仲裁停止输出（反向允许保留，可直接缩回） */
+                /* 清伸出允许：仲裁停止输出（反向允许保留，可直接缩回）。
+                   本入口服务两条路径：过流软限位（dispatch 已即时清过一次，此处幂等重复，
+                   见 dev_state.c 过流分支）与位置停车（ROD_EVT_AT_MAX，此处是唯一停机机制），勿删 */
                 (void)Arb_SendCommand(ctx->axis_id, DEV_ID_ROD_LIMIT_FWD, PRIO_LIMIT,
                                       CMD_TYPE_CLEAR_ALLOW_FWD, 0U, RT_TRUE);
                 ctx->limit_ext_sent = true;
@@ -171,7 +163,8 @@ void RodState_Update(StateMachine_t *sm, RodStateCtx_t *ctx, RodDirection_t dir,
             ctx->limit_reach_count++;
             if (!ctx->limit_ret_sent) {
                 Act_Event_Send(EVT_ROD_LIMIT_RETRACT); /* 到下限位 -> 通知仲裁 */
-                /* 清缩回允许：仲裁停止输出（正向允许保留，可直接伸出） */
+                /* 清缩回允许：仲裁停止输出（正向允许保留，可直接伸出）。
+                   幂等重复说明同上（服务过流软限位 + 位置停车两条路径），勿删 */
                 (void)Arb_SendCommand(ctx->axis_id, DEV_ID_ROD_LIMIT_REV, PRIO_LIMIT,
                                       CMD_TYPE_CLEAR_ALLOW_REV, 0U, RT_TRUE);
                 ctx->limit_ret_sent = true;
