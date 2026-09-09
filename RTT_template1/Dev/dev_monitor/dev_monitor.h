@@ -6,10 +6,10 @@
 #ifndef __DEV_MONITOR_H__
 #define __DEV_MONITOR_H__
 
-#include "Dev/dev_mgr/dev_state.h"      /* SysState_t */
-#include "Dev/dev_power/dev_bus_voltage.h" /* VoltCfg_t / g_volt_cfg */
-#include "Dev/dev_power/dev_cur_sensor.h"  /* CurCfg_t / g_cur_cfg */
-#include "Dev/dev_power/dev_polarity.h" /* PolarityState_t */
+#include "dev_state.h"      /* SysState_t */
+#include "dev_bus_voltage.h" /* VoltCfg_t / g_volt_cfg */
+#include "dev_cur_sensor.h"  /* CurCfg_t / g_cur_cfg */
+#include "dev_polarity.h" /* PolarityState_t */
 #include <stdint.h>
 
 /* 电压/电流状态枚举（便于 Watch 显示名称） */

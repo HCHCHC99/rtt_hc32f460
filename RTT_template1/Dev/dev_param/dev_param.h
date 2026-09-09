@@ -18,7 +18,7 @@
 #define __DEV_PARAM_H__
 
 #include <stdint.h>
-#include "Dev/dev_rod/dev_rod_position.h"
+#include "dev_rod_position.h"
 
 /*=============================================================================
  * 慢块 A（配置参数）：60B 记录

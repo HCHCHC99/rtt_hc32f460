@@ -7,10 +7,10 @@
 #ifndef __DEV_MODEL_H__
 #define __DEV_MODEL_H__
 
-#include "Utils/state_engine.h"
-#include "Task/task_set.h"     /* 栈大小/优先级统一管理 */
-#include "Dev/dev_rod/dev_rod_position.h"
-#include "Dev/dev_rod/dev_rod_state.h"
+#include "state_engine.h"
+#include "task_set.h"     /* 栈大小/优先级统一管理 */
+#include "dev_rod_position.h"
+#include "dev_rod_state.h"
 
 /* 系统状态机线程配置（统一放头文件） */
 #define SYS_SM_THREAD_STACK   TASK_STACK_SYS_SM

@@ -5,9 +5,9 @@
  *          不引用 mySystem / dev_model.h；返回枚举（含故障方向）交由系统状态机分流处理。
  */
 #include "dev_rod_calib.h"
-#include "Dev/dev_act/dev_act.h"          /* Arb_GetData / DIR_*：仲裁输出方向 */
-#include "Dev/dev_power/dev_cur_sensor.h" /* CurrentSensor_GetFaultMa / g_cur_cfg：打印参数 */
-#include "applications/rtt_manager.h"     /* POWER_PRINT */
+#include "dev_act.h"          /* Arb_GetData / DIR_*：仲裁输出方向 */
+#include "dev_cur_sensor.h" /* CurrentSensor_GetFaultMa / g_cur_cfg：打印参数 */
+#include "rtt_manager.h"     /* POWER_PRINT */
 #include <rtthread.h>                     /* RT_EOK */
 
 RodCalibResult_t RodCalib_OnOverCurrent(RodPosition_t *pos, RodStateCtx_t *state)

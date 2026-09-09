@@ -5,7 +5,7 @@
  *          rtconfig.h / rod_task.h / di_task.h / led_task.h / dev_model.h / dev_registry.h 均引用它。
  */
 #include "task_set.h"
-#include "applications/rtt_manager.h"
+#include "rtt_manager.h"
 #include <rtthread.h>
 #include <rthw.h>   /* rt_hw_interrupt_disable / enable */
 

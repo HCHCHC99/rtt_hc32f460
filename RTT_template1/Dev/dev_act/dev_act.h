@@ -9,7 +9,7 @@
 
 #include <stdint.h>
 #include <rtthread.h>
-#include "Task/task_set.h"     /* TASK_STACK_ARB / TASK_PRIO_ACT: single source */
+#include "task_set.h"     /* TASK_STACK_ARB / TASK_PRIO_ACT: single source */
 
 /* Module configuration */
 #define ARB_MAX_AXIS_NUM            2U     /* keep in sync with MAX_AXIS_NUM (dev_model.h) */

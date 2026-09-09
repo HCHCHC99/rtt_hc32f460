@@ -8,7 +8,7 @@
  */
 #include "dev_adc.h"
 #include "dev_adc_ops.h"
-#include "Adp/hc32_drv_adc.h"   /* ADC_DRV_VOLT_CH / ADC_DRV_CUR_CH：通道号与引脚绑定单点维护 */
+#include "hc32_drv_adc.h"   /* ADC_DRV_VOLT_CH / ADC_DRV_CUR_CH：通道号与引脚绑定单点维护 */
 #include <stddef.h>
 
 /* 全局接口表指针（由 Dev_Adc_Bind 注入） */

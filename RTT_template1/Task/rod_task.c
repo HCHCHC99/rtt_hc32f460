@@ -6,14 +6,14 @@
  *          重置，状态机消费请求进限位态并通知仲裁。
  */
 #include "rod_task.h"
-#include "Dev/dev_mgr/dev_model.h"
-#include "Dev/dev_rod/dev_rod_position.h"
-#include "Dev/dev_rod/dev_rod_state.h"
-#include "Dev/dev_config.h"
-#include "Dev/dev_hall_motor/dev_hall_motor.h"
-#include "Dev/dev_act/dev_act.h"
+#include "dev_model.h"
+#include "dev_rod_position.h"
+#include "dev_rod_state.h"
+#include "dev_config.h"
+#include "dev_hall_motor.h"
+#include "dev_act.h"
 #if DEV_ENABLE_PARAM
-#include "Dev/dev_param/dev_param.h"
+#include "dev_param.h"
 #endif
 #include <rtthread.h>
 

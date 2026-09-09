@@ -4,10 +4,10 @@
  * @note    StateMachine 实例用 Axis_t.sm_act；事件由 RodState_Update 每 10ms 合成一次。
  */
 #include "dev_rod_state.h"
-#include "Dev/dev_mgr/dev_model.h"       /* mySystem / Act_Event_Send */
-#include "Dev/dev_mgr/dev_event_def.h"
-#include "Dev/dev_act/dev_act.h"         /* Arb_SendCommand: 限位清允许命令 */
-#include "applications/rtt_manager.h"
+#include "dev_model.h"       /* mySystem / Act_Event_Send */
+#include "dev_event_def.h"
+#include "dev_act.h"         /* Arb_SendCommand: 限位清允许命令 */
+#include "rtt_manager.h"
 #include <rtthread.h>
 
 /* ============ 跳转表 ============ */

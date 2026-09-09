@@ -8,10 +8,10 @@
  *          停止/急停 = 双低（用户：双低应为刹车态，待实测）。
  */
 #include "dev_gpio_motor.h"
-#include "Dev/dev_param/dev_param.h"      /* MOTOR_GPIO_DIR_INVERT_DEFAULT 存储默认值（单点） */
-#include "applications/rtt_manager.h"
-#include "Adp/hc32_drv_gpio.h"
-#include "Dev/dev_act/dev_act.h"
+#include "dev_param.h"      /* MOTOR_GPIO_DIR_INVERT_DEFAULT 存储默认值（单点） */
+#include "rtt_manager.h"
+#include "hc32_drv_gpio.h"
+#include "dev_act.h"
 #include <rtthread.h>
 #include <rthw.h>   /* rt_hw_interrupt_disable / enable */
 

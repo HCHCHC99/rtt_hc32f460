@@ -8,13 +8,13 @@
  *          仲裁命令 RUN_FWD/REV @98% 经 Polarity_SendArb（队列满只计数告警）。
  */
 #include "dev_polarity.h"
-#include "Dev/dev_act/dev_act.h"
-#include "Dev/dev_mgr/dev_model.h"
-#include "Dev/dev_mgr/dev_state.h"     /* Sys_Event_Send：方向沿 -> EVT_SYS_POLARITY_CHG */
-#include "Dev/dev_mgr/dev_event_def.h"
+#include "dev_act.h"
+#include "dev_model.h"
+#include "dev_state.h"     /* Sys_Event_Send：方向沿 -> EVT_SYS_POLARITY_CHG */
+#include "dev_event_def.h"
 #include "drv_gpio.h"          /* GET_PIN / GPIO_PORT_B */
 #include "rtt_manager.h"
-#include "Utils/us_timer.h"
+#include "us_timer.h"
 #include <rthw.h>
 #include <rtthread.h>
 #include <rtdevice.h>

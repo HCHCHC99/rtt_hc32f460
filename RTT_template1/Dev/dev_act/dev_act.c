@@ -3,8 +3,8 @@
  * @brief   Motor arbitration kernel implementation
  */
 #include "dev_act.h"
-#include "Dev/dev_mgr/dev_model.h"
-#include "applications/rtt_manager.h"
+#include "dev_model.h"
+#include "rtt_manager.h"
 #include <rtthread.h>
 #include <string.h>
 

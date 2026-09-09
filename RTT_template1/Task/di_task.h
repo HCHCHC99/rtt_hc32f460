@@ -6,7 +6,7 @@
 #ifndef __DI_TASK_H__
 #define __DI_TASK_H__
 
-#include "Task/task_set.h"     /* 栈大小/优先级统一管理 */
+#include "task_set.h"     /* 栈大小/优先级统一管理 */
 
 /* 默认配置宏（统一放头文件） */
 #define DI_SCAN_PERIOD_MS    (2U)     /* DI 采样周期 ms：2ms */

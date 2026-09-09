@@ -12,8 +12,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <rtthread.h>
-#include "applications/rtt_manager.h"
-#include "Adp/hc32_drv_flash.h"
+#include "rtt_manager.h"
+#include "hc32_drv_flash.h"
 
 /*=============================================================================
  * 魔数定义

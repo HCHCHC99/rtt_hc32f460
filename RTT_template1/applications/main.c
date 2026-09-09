@@ -1,4 +1,4 @@
-#include <Adp/hc32_drv_timer.h>
+#include "hc32_drv_timer.h"
 /*
  * Copyright (c) 2006-2022, RT-Thread Development Team
  * Copyright (c) 2022, Xiaohua Semiconductor Co., Ltd.
@@ -17,24 +17,24 @@
 #include "common.h"
 #include "rtt_manager.h"
 #include <stdlib.h>
-#include "Dev/dev_registry.h"
-#include "Dev/dev_mgr/dev_model.h"
-#include "Dev/dev_mgr/dev_state.h"
-#include "Dev/dev_adc/dev_adc.h"
-#include "Adp/hc32_drv_adc.h"
-#include "Utils/us_timer.h"
-#include "Dev/dev_power/dev_cur_sensor.h"
-#include "Dev/dev_power/dev_bus_voltage.h"
-#include "Dev/dev_power/dev_power_isr.h"
-#include "Dev/dev_monitor/dev_monitor.h"
-#include "Dev/dev_power/dev_polarity.h"
-#include "Task/led_task.h"
-#include "Task/di_task.h"
-#include "Task/rod_task.h"
-#include "Task/task_set.h"
-#include "Dev/dev_act/dev_act.h"
-#include "Dev/dev_config.h"
-#include "Dev/dev_param/dev_param.h"
+#include "dev_registry.h"
+#include "dev_model.h"
+#include "dev_state.h"
+#include "dev_adc.h"
+#include "hc32_drv_adc.h"
+#include "us_timer.h"
+#include "dev_cur_sensor.h"
+#include "dev_bus_voltage.h"
+#include "dev_power_isr.h"
+#include "dev_monitor.h"
+#include "dev_polarity.h"
+#include "led_task.h"
+#include "di_task.h"
+#include "rod_task.h"
+#include "task_set.h"
+#include "dev_act.h"
+#include "dev_config.h"
+#include "dev_param.h"
 
 /* dev_sm_thread.c 的 INIT 诊断计数 */
 extern volatile uint32_t g_sm_diag_entered;

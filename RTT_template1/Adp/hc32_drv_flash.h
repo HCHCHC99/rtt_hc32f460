@@ -14,7 +14,7 @@
 #include "hc32_ll_efm.h"
 
 /* 打印开关：rtt_manager.h 的 FLASH_PRINT（默认关） */
-#include "applications/rtt_manager.h"
+#include "rtt_manager.h"
 
 /* FLASH 操作状态 */
 typedef enum

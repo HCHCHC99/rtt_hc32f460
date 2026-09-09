@@ -5,9 +5,9 @@
  *          独立线程（C 模式），优先级取低值，栈 1024。
  */
 #include "led_task.h"
-#include "Adp/hc32_drv_gpio.h"
+#include "hc32_drv_gpio.h"
 #include "rtt_manager.h"      /* LED_PRINT */
-#include "Utils/us_timer.h"   /* 翻转打印带 us 时间戳 */
+#include "us_timer.h"   /* 翻转打印带 us 时间戳 */
 #include <rtthread.h>
 
 

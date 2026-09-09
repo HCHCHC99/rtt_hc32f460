@@ -2,7 +2,7 @@
 #define __DEV_REGISTRY_H__
 
 #include <stdint.h>
-#include "Task/task_set.h"     /* 栈大小/优先级统一管理 */
+#include "task_set.h"     /* 栈大小/优先级统一管理 */
 
 /* 配置宏（统一放头文件） */
 #define MAX_REG_MODULES         (16U)

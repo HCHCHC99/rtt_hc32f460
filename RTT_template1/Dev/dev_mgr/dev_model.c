@@ -8,8 +8,8 @@
 #include "dev_state.h"
 #include "dev_event_def.h"
 #include "rtt_manager.h"
-#include "Dev/dev_config.h"
-#include "Dev/dev_param/dev_param.h"
+#include "dev_config.h"
+#include "dev_param.h"
 #include <rtthread.h>
 
 /* 全局系统对象 */

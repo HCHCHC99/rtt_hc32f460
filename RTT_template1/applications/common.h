@@ -7,7 +7,7 @@
 #define COMMON_H
 
 #include "RTT/rtt_log.h"
-#include "Adp/hc32_drv_gpio.h"
+#include "hc32_drv_gpio.h"
 
 #endif
 

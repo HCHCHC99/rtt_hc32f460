@@ -5,15 +5,15 @@
  *          dev_param_rod.c）；保存走 Dev_Param_Save()（电机运行中拒绝）。
  */
 #include "dev_param.h"
-#include "Utils/param_manager.h"
-#include "applications/rtt_manager.h"
+#include "param_manager.h"
+#include "rtt_manager.h"
 #include "rtthread.h"
-#include "Dev/dev_config.h"
-#include "Dev/dev_power/dev_bus_voltage.h"
-#include "Dev/dev_power/dev_cur_sensor.h"
-#include "Dev/dev_hall_motor/dev_hall_motor.h"   /* g_mothall_invert_dir（extern 声明） */
-#include "Dev/dev_gpio_motor/dev_gpio_motor.h"   /* Dev_MotorGpio_SetDirInvert（函数声明） */
-#include "Dev/dev_act/dev_act.h"
+#include "dev_config.h"
+#include "dev_bus_voltage.h"
+#include "dev_cur_sensor.h"
+#include "dev_hall_motor.h"   /* g_mothall_invert_dir（extern 声明） */
+#include "dev_gpio_motor.h"   /* Dev_MotorGpio_SetDirInvert（函数声明） */
+#include "dev_act.h"
 #include <stddef.h>
 #include <string.h>
 

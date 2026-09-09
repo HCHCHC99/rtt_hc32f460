@@ -12,9 +12,9 @@
  *            互补 50% = 动态刹车），并撤销未决命令防止线程自启动。
  */
 #include "dev_pwm.h"
-#include "Adp/hc32_drv_pwm.h"
-#include "applications/rtt_manager.h"
-#include "Dev/dev_act/dev_act.h"
+#include "hc32_drv_pwm.h"
+#include "rtt_manager.h"
+#include "dev_act.h"
 #include <rtthread.h>
 #include <rthw.h>   /* rt_hw_interrupt_disable / enable */
 

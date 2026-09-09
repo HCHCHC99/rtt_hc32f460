@@ -5,7 +5,7 @@
 #ifndef __LED_TASK_H__
 #define __LED_TASK_H__
 
-#include "Task/task_set.h"     /* 栈大小/优先级统一管理 */
+#include "task_set.h"     /* 栈大小/优先级统一管理 */
 
 /* 默认配置宏（统一放头文件） */
 #define LED_TOGGLE_MS    (1000U)  /* LED 翻转周期 ms */

@@ -5,7 +5,7 @@
 #ifndef __ROD_TASK_H__
 #define __ROD_TASK_H__
 
-#include "Task/task_set.h"     /* 栈大小/优先级统一管理 */
+#include "task_set.h"     /* 栈大小/优先级统一管理 */
 
 /* 默认配置宏（统一放头文件） */
 #define ROD_SCAN_PERIOD_MS    (10U)     /* 推杆位置/状态更新周期 ms */

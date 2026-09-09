@@ -4,9 +4,9 @@
  * @note    仿 dev_polarity 窗口机制；不做打印/阻塞（Scan 由 rod_task 线程调用）。
  */
 #include "dev_hall_rod.h"
-#include "Dev/dev_mgr/dev_state.h"        /* Sys_Event_Send */
-#include "Dev/dev_mgr/dev_event_def.h"
-#include "applications/rtt_manager.h"
+#include "dev_state.h"        /* Sys_Event_Send */
+#include "dev_event_def.h"
+#include "rtt_manager.h"
 #include "drv_gpio.h"                     /* GET_PIN / rt_pin_read */
 #include <rtthread.h>
 

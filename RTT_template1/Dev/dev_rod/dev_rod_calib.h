@@ -14,8 +14,8 @@
 #define __DEV_ROD_CALIB_H__
 
 #include <stdint.h>
-#include "Dev/dev_rod/dev_rod_position.h"
-#include "Dev/dev_rod/dev_rod_state.h"
+#include "dev_rod_position.h"
+#include "dev_rod_state.h"
 
 /**
  * @brief  过流判定结果：调用方（dev_state 过流分支）据此分流

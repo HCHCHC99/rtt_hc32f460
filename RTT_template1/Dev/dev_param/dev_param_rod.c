@@ -11,10 +11,10 @@
  *          - 本模块不依赖 mySystem：位置实例经 RodApply 注入，测试钩子传参。
  */
 #include "dev_param.h"
-#include "Utils/param_manager.h"
-#include "applications/rtt_manager.h"
+#include "param_manager.h"
+#include "rtt_manager.h"
 #include "rtthread.h"
-#include "Dev/dev_config.h"
+#include "dev_config.h"
 #include <stddef.h>
 #include <string.h>
 

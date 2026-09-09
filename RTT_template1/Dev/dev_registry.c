@@ -8,14 +8,14 @@
 #include "dev_registry.h"
 #include "dev_config.h"
 #include "rtt_manager.h"
-#include "Dev/dev_adc/dev_adc.h"
-#include "Dev/dev_power/dev_cur_sensor.h"
-#include "Dev/dev_power/dev_bus_voltage.h"
-#include "Dev/dev_power/dev_polarity.h"
-#include "Dev/dev_monitor/dev_monitor.h"
-#include "Dev/dev_act/dev_act.h"
-#include "Dev/dev_gpio_motor/dev_gpio_motor.h"
-#include "Dev/dev_hall_motor/dev_hall_motor.h"
+#include "dev_adc.h"
+#include "dev_cur_sensor.h"
+#include "dev_bus_voltage.h"
+#include "dev_polarity.h"
+#include "dev_monitor.h"
+#include "dev_act.h"
+#include "dev_gpio_motor.h"
+#include "dev_hall_motor.h"
 #include <rtthread.h>
 
 

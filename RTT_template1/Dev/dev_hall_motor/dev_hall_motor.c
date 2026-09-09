@@ -6,9 +6,9 @@
  *          测速滤波/状态检测在 MotorHall_Task（对应参考 motor_hall_update）。
  */
 #include "dev_hall_motor.h"
-#include "Dev/dev_param/dev_param.h"      /* MOTOR_HALL_DIRECTION_INVERT_DEFAULT 存储默认值（单点） */
-#include "Utils/us_timer.h"               /* UsTimer_* us 时基（GetDelta/GetTimestampUs/DeltaToUs） */
-#include "applications/rtt_manager.h"
+#include "dev_param.h"      /* MOTOR_HALL_DIRECTION_INVERT_DEFAULT 存储默认值（单点） */
+#include "us_timer.h"               /* UsTimer_* us 时基（GetDelta/GetTimestampUs/DeltaToUs） */
+#include "rtt_manager.h"
 #include <rtthread.h>
 #include <rthw.h>
 #include <string.h>

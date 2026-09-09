@@ -1,4 +1,4 @@
-#include <Adp/hc32_drv_timer.h>
+#include "hc32_drv_timer.h"
 /**
  * @file    dev_state.c
  * @brief   系统状态机实现（表驱动移植 + 故障联动）
@@ -11,17 +11,17 @@
 #include "dev_event_def.h"
 #include "dev_model.h"
 #include "rtt_manager.h"
-#include "Utils/us_timer.h"
-#include "Dev/dev_registry.h"
-#include "Dev/dev_adc/dev_adc.h"
-#include "Dev/dev_power/dev_power_isr.h"
-#include "Dev/dev_act/dev_act.h"
-#include "Dev/dev_power/dev_polarity.h"
-#include "Dev/dev_power/dev_cur_sensor.h"
-#include "Dev/dev_power/dev_bus_voltage.h"
-#include "Dev/dev_config.h"
-#include "Dev/dev_param/dev_param.h"
-#include "Dev/dev_rod/dev_rod_calib.h"
+#include "us_timer.h"
+#include "dev_registry.h"
+#include "dev_adc.h"
+#include "dev_power_isr.h"
+#include "dev_act.h"
+#include "dev_polarity.h"
+#include "dev_cur_sensor.h"
+#include "dev_bus_voltage.h"
+#include "dev_config.h"
+#include "dev_param.h"
+#include "dev_rod_calib.h"
 #include <rtthread.h>
 
 static volatile uint32_t s_arb_cmd_send_fail_count = 0U;

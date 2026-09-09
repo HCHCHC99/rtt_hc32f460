@@ -4,13 +4,13 @@
  * @note    Watch 直接看 g_monitor；RTT 打印为可选辅助（MONITOR_PRINT）。
  */
 #include "dev_monitor.h"
-#include "Dev/dev_mgr/dev_model.h"     /* mySystem */
-#include "Dev/dev_adc/dev_adc.h"
-#include "Dev/dev_power/dev_bus_voltage.h"
-#include "Dev/dev_power/dev_cur_sensor.h"
-#include "Dev/dev_rod/dev_rod_position.h"
-#include "Adp/hc32_drv_gpio.h"         /* Hc32_Gpio_Read / PH2 */
-#include "applications/rtt_manager.h"
+#include "dev_model.h"     /* mySystem */
+#include "dev_adc.h"
+#include "dev_bus_voltage.h"
+#include "dev_cur_sensor.h"
+#include "dev_rod_position.h"
+#include "hc32_drv_gpio.h"         /* Hc32_Gpio_Read / PH2 */
+#include "rtt_manager.h"
 #include <rtthread.h>
 #include <string.h>
 

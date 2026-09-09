@@ -4,7 +4,7 @@
  * @note    基于 HB_chuchai v6.0.4 Adc.c 裁剪：去 DMA；TMR0_1 CH_B 硬件触发 500us（AOS 事件路由）+ EOCA 滑动窗口
  */
 #include "hc32_drv_adc.h"
-#include "Dev/dev_adc/dev_adc_ops.h"   /* ADC_MEAN_WINDOW_SAMPLES */
+#include "dev_adc_ops.h"   /* ADC_MEAN_WINDOW_SAMPLES */
 #include "hc32_ll_tmr0.h"
 #include "hc32_ll_aos.h"
 #include <rtthread.h>

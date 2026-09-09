@@ -5,7 +5,7 @@
  *          电源极性消抖窗口 5 点 x 2ms 采样 = 10ms。
  */
 #include "di_task.h"
-#include "Dev/dev_power/dev_polarity.h"
+#include "dev_polarity.h"
 #include <rtthread.h>
 
 
