@@ -36,19 +36,12 @@ void RodPosition_SetParams(RodPosition_t *pos, float stroke_mm, float reduction_
 
 void RodPosition_Update(RodPosition_t *pos, int32_t delta_pulses)
 {
-    /* 1. 脉冲增量 -> 机械位移增量（mm） */
+    /* 1. 脉冲增量 -> 机械位移增量（mm）；位置无界累加，允许越过 [0, stroke]
+          （用户定：窗口 a~d 只作校准使能判定，不钳位实际行程计算） */
     float delta_mm = (float)delta_pulses * pos->pulse_to_mm;
     pos->position_mm += delta_mm;
 
-    /* 2. 限位保护：防止累计误差溢出校准区判断范围 */
-    if (pos->position_mm > pos->stroke_mm + pos->calib_tolerance_mm * 2.0f) {
-        pos->position_mm = pos->stroke_mm + pos->calib_tolerance_mm * 2.0f;
-    }
-    if (pos->position_mm < -pos->calib_tolerance_mm * 2.0f) {
-        pos->position_mm = -pos->calib_tolerance_mm * 2.0f;
-    }
-
-    /* 3. 更新校准使能窗口标志（窗口参数 calib_win_a/b/c/d，flash A 块加载；
+    /* 2. 更新校准使能窗口标志（窗口参数 calib_win_a/b/c/d，flash A 块加载；
           a>b 视同 a==b、c<d 视同 c==d，宽容处理不报错） */
     if (pos->calib_win_a < pos->calib_win_b) {
         pos->in_calib_zone_min = (pos->position_mm >= pos->calib_win_a) &&
@@ -63,7 +56,7 @@ void RodPosition_Update(RodPosition_t *pos, int32_t delta_pulses)
         pos->in_calib_zone_max = (pos->position_mm >= pos->calib_win_c);
     }
 
-    /* 4. 动态更新校准允许标志 */
+    /* 3. 动态更新校准允许标志 */
     if (pos->calib_state == POSITION_NOT_CALIBRATED) {
         pos->calib_allowed = true;   /* 首次校准：始终允许 */
     } else {

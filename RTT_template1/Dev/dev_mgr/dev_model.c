@@ -34,7 +34,9 @@ void App_Model_Init(void)
         char name[12];
 
         ax->id  = i;
-        ax->dir = ACT_DIR_NONE;   /* 默认未配置；实际应来自机型/标定数据 */
+        /* 轴配置：单轴推杆系统 axis0 固定启用（结合方向=伸出）；多轴扩展时改由机型/标定数据配置。
+           注意：rod_task 按 dir!=NONE 过滤轴，漏配会静默跳过位置积分/校准/状态机 */
+        ax->dir = (i == 0U) ? (AxisDir_t)ACT_DIR_COMBINE_IS_MOVE_OUT : ACT_DIR_NONE;
         rt_snprintf(name, sizeof(name), "act%d_evt", i);
         ax->evt_act = rt_event_create(name, RT_IPC_FLAG_FIFO);
 

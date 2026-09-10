@@ -313,8 +313,8 @@ static float MotorHall_IntervalToRpm(const MotorHallInst_t *inst, uint32_t inter
 
     {
         float rpm = 60000000.0f / ((float)interval_us * pulses_per_rev);
-        if (rpm > 100000.0f) {
-            rpm = 100000.0f;
+        if (rpm > 1000000.0f) {   /* 仅显示限幅（不阻断增量传递）；参考 100000 上限已拉高 */
+            rpm = 1000000.0f;
         }
         return rpm;
     }
