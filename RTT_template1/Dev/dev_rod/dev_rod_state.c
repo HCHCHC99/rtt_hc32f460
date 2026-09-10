@@ -150,26 +150,28 @@ void RodState_Update(StateMachine_t *sm, RodStateCtx_t *ctx, RodDirection_t dir,
             ctx->limit_reach_count++;
             if (!ctx->limit_ext_sent) {
                 Act_Event_Send(EVT_ROD_LIMIT_EXTEND); /* 到上限位 -> 通知仲裁 */
-                /* 清伸出允许：仲裁停止输出（反向允许保留，可直接缩回）。
-                   本入口服务两条路径：过流软限位（dispatch 已即时清过一次，此处幂等重复，
-                   见 dev_state.c 过流分支）与位置停车（ROD_EVT_AT_MAX，此处是唯一停机机制），勿删 */
-                (void)Arb_SendCommand(ctx->axis_id, DEV_ID_ROD_LIMIT_FWD, PRIO_LIMIT,
-                                      CMD_TYPE_CLEAR_ALLOW_FWD, 0U, RT_TRUE);
                 ctx->limit_ext_sent = true;
             }
         }
+        /* 限位驻留期每拍重发清允许（缺口B修复）：沿触发一次挡不住后续 CMD 重新置位
+           （Arb_CmdListSetAllow 会把 CMD_FWD 重新加回 allow 列表恢复输出）。
+           每 10ms 重发一次，任一 CMD 重新置位后最迟下一拍被再次清除，电机残余
+           输出 ≤1 个扫描周期（10ms 电流脉冲）。本入口服务过流软限位、位置停车、
+           上电恢复超程三条路径；冗余重发为有意安全设计（at-least-once），勿优化为"只发一次" */
+        (void)Arb_SendCommand(ctx->axis_id, DEV_ID_ROD_LIMIT_FWD, PRIO_LIMIT,
+                              CMD_TYPE_CLEAR_ALLOW_FWD, 0U, RT_TRUE);
     } else if (cur == ROD_STATE_RET_LIMIT) {
         if (prev != ROD_STATE_RET_LIMIT) {
             ctx->limit_reach_count++;
             if (!ctx->limit_ret_sent) {
                 Act_Event_Send(EVT_ROD_LIMIT_RETRACT); /* 到下限位 -> 通知仲裁 */
-                /* 清缩回允许：仲裁停止输出（正向允许保留，可直接伸出）。
-                   幂等重复说明同上（服务过流软限位 + 位置停车两条路径），勿删 */
-                (void)Arb_SendCommand(ctx->axis_id, DEV_ID_ROD_LIMIT_REV, PRIO_LIMIT,
-                                      CMD_TYPE_CLEAR_ALLOW_REV, 0U, RT_TRUE);
                 ctx->limit_ret_sent = true;
             }
         }
+        /* 限位驻留期每拍重发清允许（缺口B修复，语义同上限位分支）：服务过流软限位、
+           上电恢复负超程路径；冗余重发为有意安全设计（at-least-once），勿优化为"只发一次" */
+        (void)Arb_SendCommand(ctx->axis_id, DEV_ID_ROD_LIMIT_REV, PRIO_LIMIT,
+                              CMD_TYPE_CLEAR_ALLOW_REV, 0U, RT_TRUE);
     } else if (cur == ROD_STATE_EXT_FAULT || cur == ROD_STATE_RET_FAULT) {
         if (prev != cur) {
             ctx->fault_count++;
