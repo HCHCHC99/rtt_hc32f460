@@ -154,6 +154,16 @@ void Dev_Param_RodApply(RodPosition_t *pos)
         return;
     }
 
+    /* seq<=1 = Param_Init 默认落盘记录（SetField32 seq=0 后 Param_Save 内部 +1 写入），
+       非真实欠压保存（首次真实保存 = RAM seq 1 + 1 = 2，此后 >=2）：
+       不恢复，防"假校准"——全擦后默认行程会被引擎写成有效记录，若不挡，
+       下次上电恢复 CALIBRATED+默认行程，未校准板伪装到上限位（pos>=stroke-margin → EXT_LIMIT） */
+    if (s_rod_record.sequence_id <= 1U) {
+        PARAM_PRINT("[RODP] apply skipped (default-fill record seq=%lu)",
+                    (unsigned long)s_rod_record.sequence_id);
+        return;
+    }
+
     /* 恢复位置基准：写入加载的行程并置已校准，霍尔增量在此基准上继续累加 */
     pos->position_mm = s_rod_record.position_mm;
     pos->calib_state = POSITION_CALIBRATED;
@@ -187,6 +197,13 @@ void Dev_Param_RodPollSave(void)
 
     if (s_rod_pos_ptr == NULL) {
         MAIN_D("[RODP] poll save FAILED: no position instance");
+        return;
+    }
+    /* 未校准（首次过流/限位校准前）：position_mm 是 0 起步的假基准漂移值，
+       保存会让下次上电 seq>=2 恢复 CALIBRATED+错误行程（seq<=1 门挡不住），
+       未校准被伪装成已校准——拒绝保存，只有真实校准后的行程才落盘 */
+    if (!RodPosition_IsCalibrated(s_rod_pos_ptr)) {
+        PARAM_PRINT("[RODP] save skipped: position NOT calibrated");
         return;
     }
     (void)Dev_Param_RodSave(RodPosition_GetCurrent(s_rod_pos_ptr));
