@@ -244,7 +244,7 @@ int main(void)
     UsTimer_Bind(&hc_us_timer_ops);
     UsTimer_Init();
     UsTimer_Start();
-    rt_kprintf("aaaa");
+
     /* ADC 设备：绑定 HC32 底层驱动（dev_adc_ops），注册即 init（TMR0_1+AOS 已配置，未启动） */
     Dev_Adc_Bind(&hc32_adc_ops);
 #if DEV_ENABLE_PARAM

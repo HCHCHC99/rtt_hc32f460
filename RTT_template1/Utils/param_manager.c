@@ -291,7 +291,7 @@ int32_t Param_Save(const Param_Config_t *pConfig, Param_Runtime_t *pRuntime)
     paramWords = pConfig->paramSize / 4;
     seq = GetField32(pConfig->pParamBuf, pConfig->seqOffset);
 
-    PARAM_PRINT("Param save start, old_seq=%lu", (unsigned long)seq);
+
 
     while (retry < MAX_WRITE_RETRY) {
         write_addr = pRuntime->curr_addr;

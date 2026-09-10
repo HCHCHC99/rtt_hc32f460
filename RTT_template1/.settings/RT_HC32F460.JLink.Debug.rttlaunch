@@ -19,9 +19,9 @@
 <booleanAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.enableSemihostingIoclientGdbClient" value="false"/>
 <booleanAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.enableSemihostingIoclientTelnet" value="true"/>
 <booleanAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.enableSwo" value="false"/>
-<stringAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.eraseEndAddress" value=""/>
-<intAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.eraseMode" value="1"/>
-<stringAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.eraseStartAddress" value=""/>
+<stringAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.eraseEndAddress" value="0x20000"/>
+<intAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.eraseMode" value="2"/>
+<stringAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.eraseStartAddress" value="0"/>
 <intAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.firstResetSpeed" value="1000"/>
 <stringAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.firstResetType" value=""/>
 <stringAttribute key="ilg.gnumcueclipse.debug.gdbjtag.jlink.flashDeviceName" value="HC32F460PETB"/>
