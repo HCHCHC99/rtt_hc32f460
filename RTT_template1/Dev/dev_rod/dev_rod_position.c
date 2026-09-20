@@ -18,7 +18,6 @@ void RodPosition_Init(RodPosition_t *pos)
     pos->stroke_mm         = 0.0f;
     pos->reduction_ratio   = 1.0f;
     pos->pulse_to_mm       = 0.0f;
-    pos->calib_tolerance_mm = 0.0f;
     pos->calib_win_a       = ROD_CALIB_WIN_A_DFT;
     pos->calib_win_b       = ROD_CALIB_WIN_B_DFT;
     pos->calib_win_c       = ROD_CALIB_WIN_C_DFT;
@@ -26,12 +25,11 @@ void RodPosition_Init(RodPosition_t *pos)
 }
 
 void RodPosition_SetParams(RodPosition_t *pos, float stroke_mm, float reduction_ratio,
-                           float hall_pulses_per_rev, float screw_lead_mm, float calib_tolerance_mm)
+                           float hall_pulses_per_rev, float screw_lead_mm)
 {
     pos->stroke_mm          = stroke_mm;
     pos->reduction_ratio    = reduction_ratio;
     pos->pulse_to_mm        = screw_lead_mm / (reduction_ratio * hall_pulses_per_rev);
-    pos->calib_tolerance_mm = calib_tolerance_mm;
 }
 
 void RodPosition_Update(RodPosition_t *pos, int32_t delta_pulses)

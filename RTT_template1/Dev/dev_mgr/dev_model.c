@@ -40,9 +40,12 @@ void App_Model_Init(void)
         rt_snprintf(name, sizeof(name), "act%d_evt", i);
         ax->evt_act = rt_event_create(name, RT_IPC_FLAG_FIFO);
 
-        /* 推杆位置 + 状态模块初始化（表驱动挂 sm_act；行程1000/减速比10/每转12脉冲/导程10/容差3） */
+        /* 推杆位置 + 状态模块初始化（表驱动挂 sm_act）
+           机械参数用 DFT 宏做初值（单点在 dev_param.h）；App_Model_Init 末尾
+           Dev_Param_RodApply 以 flash A 块加载值覆盖（转动机构模式，数值单位=度） */
         RodPosition_Init(&ax->position);
-        RodPosition_SetParams(&ax->position, 1000.0f, 10.0f, 12.0f, 10.0f, 3.0f);
+        RodPosition_SetParams(&ax->position, ROD_STROKE_DFT, ROD_REDUCTION_RATIO_DFT,
+                              ROD_HALL_PULSES_DFT, ROD_SCREW_LEAD_DFT);
         RodState_Init(&ax->sm_act, &ax->state, (uint8_t)i, &ax->position);
         RT_ASSERT(ax->evt_act != RT_NULL);
         /* sm_act 暂不挂表（Route B 调 Act_State_Init），保持清零即可 */

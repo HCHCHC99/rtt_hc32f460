@@ -27,6 +27,23 @@ static const char *const s_cur_st_name[] = { "NORMAL", "OVER" };
 static const char *const s_pol_name[] = {
     "UNKNOWN", "UNPOWERED", "FWD", "REV", "ABNORMAL",
 };
+static const char *const s_rod_calib_name[] = { "NOT_CAL", "CALIB" };
+
+static char s_rod_pos_a[12];    /* Monitor_DegFmt 输出缓冲 */
+
+/* float 度 → "[符号]整数.1位" 字符串（打印规范：不打印浮点；0.1° 精度 >> 脉冲当量 0.025°） */
+static void Monitor_DegFmt(float v, char *pBuf, uint32_t bufSize)
+{
+    uint8_t neg = (v < 0.0f) ? 1U : 0U;
+    uint32_t x10;
+
+    if (neg) {
+        v = -v;
+    }
+    x10 = (uint32_t)(v * 10.0f + 0.5f);
+    rt_snprintf(pBuf, bufSize, "%s%lu.%01lu", (neg ? "-" : ""),
+                (unsigned long)(x10 / 10U), (unsigned long)(x10 % 10U));
+}
 
 /* 状态枚举 → 名字（诊断打印用；越界返回 UNK） */
 const char *Monitor_SysStateName(uint8_t state)
@@ -126,6 +143,14 @@ void Monitor_DumpStatus(void)
     MONITOR_SYS_PRINT("fault: volt=%s cur=%s",
                   s_volt_st_name[g_monitor.volt_status],
                   s_cur_st_name[g_monitor.cur_status]);
+    /* 推杆位置/校准（转动模式：单位=度；数据由 Monitor_Task 100ms 刷新） */
+    if (g_monitor.rod_calibrated < 2U) {
+        Monitor_DegFmt(g_monitor.rod_pos_mm, s_rod_pos_a, sizeof(s_rod_pos_a));
+        ROD_POS_PRINT("calib=%s pos=%sdeg",
+                      s_rod_calib_name[g_monitor.rod_calibrated], s_rod_pos_a);
+    } else {
+        ROD_POS_PRINT("calib=UNK");
+    }
     MONITOR_SYS_PRINT("=====================================");
 }
 

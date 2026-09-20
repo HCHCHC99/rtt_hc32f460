@@ -33,7 +33,6 @@ typedef struct {
     float                stroke_mm;          /* 总行程 mm（1000） */
     float                reduction_ratio;    /* 减速比（10） */
     float                pulse_to_mm;        /* 每霍尔脉冲位移 mm = 导程/(减速比×每转脉冲) */
-    float                calib_tolerance_mm; /* 位置钳位 margin mm（3，不再用于校准窗口） */
 
     /* 软限位校准窗口（flash A 块加载，RodApply 写入；语义见文件顶部宏注释）
        下限使能：a<b ? pos∈[a,b] : pos<=a   上限使能：c>d ? pos∈[d,c] : pos>=c */
@@ -46,7 +45,7 @@ typedef struct {
 
 void  RodPosition_Init(RodPosition_t *pos);
 void  RodPosition_SetParams(RodPosition_t *pos, float stroke_mm, float reduction_ratio,
-                            float hall_pulses_per_rev, float screw_lead_mm, float calib_tolerance_mm);
+                            float hall_pulses_per_rev, float screw_lead_mm);
 void  RodPosition_Update(RodPosition_t *pos, int32_t delta_pulses);
 bool  RodPosition_OnMinLimit(RodPosition_t *pos, bool triggered);   /* 返回 true=已重置为 0 */
 bool  RodPosition_OnMaxLimit(RodPosition_t *pos, bool triggered);   /* 返回 true=已重置为行程 */

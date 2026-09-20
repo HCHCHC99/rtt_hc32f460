@@ -12,7 +12,7 @@
 /* ===================== 开关区（1=启用 0=关闭） ===================== */
 #define SYS_STATE_PRINT_EN      0   /* 系统状态机：跳转/入口 */
 #define DEV_REG_PRINT_EN        0   /* 设备注册 */
-#define POWER_PRINT_EN          0   /* 电源设备：过压/欠压/过流 */
+#define POWER_PRINT_EN          1   /* 电源设备：过压/欠压/过流 */
 #define POLARITY_PRINT_EN       0   /* 电源极性：跳变/初始化 */
 #define ARB_PRINT_EN            0   /* 电机仲裁：决策/队列/复位 */
 #define SM_DIAG_PRINT_EN        0   /* 状态机诊断：cur/evt_flag/心跳计数 */
@@ -21,9 +21,10 @@
 #define ROD_PRINT_EN            0   /* 推杆：状态/限位/霍尔故障 */
 #define HALL_ROD_PRINT_EN       0   /* 推杆霍尔：限位/双高故障 */
 #define HALL_MOTOR_PRINT_EN     0   /* 电机霍尔：初始化/周期观测 */
-#define MONITOR_PRINT_EN        0   /* 采样监视（1s 周期打印） */
+#define MONITOR_PRINT_EN        1   /* 采样监视（1s 周期打印） */
 #define QUEUE_INIT_PRINT_EN     0   /* 队列初始化（示例，默认关闭） */
-#define MONITOR_SYS_PRINT_EN    0   /* 系统1s打印 */
+#define MONITOR_SYS_PRINT_EN    1   /* 系统1s打印 */
+#define ROD_POS_PRINT_EN        1   /* 推杆位置/校准 1s 周期打印（转动模式：单位=度） */
 #define RTT_PRINTF_EN           0   /* RT-Thread rt_kprintf 重定向到 RTT（rt_hw_console_output） */
 #define TASK_STACK_PRINT_EN     0   /* 任务栈统一管理：各线程栈大小/总栈/堆余量 */
 #define PWM_PRINT_EN            0   /* PWM 调速：状态切换/启动/停止（ramp 过程不打） */
@@ -143,6 +144,12 @@
 #define MONITOR_SYS_PRINT(fmt, ...)     MAIN_D("[SYS_MON] " fmt, ##__VA_ARGS__)
 #else
 #define MONITOR_SYS_PRINT(fmt, ...)     ((void)0)
+#endif
+
+#if ROD_POS_PRINT_EN
+#define ROD_POS_PRINT(fmt, ...)     MAIN_D("[ROD_POS] " fmt, ##__VA_ARGS__)
+#else
+#define ROD_POS_PRINT(fmt, ...)     ((void)0)
 #endif
 
 #if TASK_STACK_PRINT_EN

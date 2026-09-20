@@ -18,9 +18,11 @@
 
 /* 阈值配置全局变量（类型/声明见 dev_cur_sensor.h；debugger 改 g_cur_cfg 实时生效） */
 volatile CurCfg_t g_cur_cfg = {
-    CUR_OVER_CUR_TH_MA_DFT, CUR_OVER_WINDOW_MS_DFT,
+    CUR_OVER_CUR_TH_MA_DFT, CUR_OVER_WINDOW_MS_DFT, CUR_BLOCK_MS_DFT,
 };
 volatile uint32_t g_cur_sim_ma = 500U;    /* 模拟电流 mA（CUR_SIM_MODE_EN=1 时生效） */
+
+static volatile uint16_t s_u16BlockMs;    /* 过流检测屏蔽剩余 ms（方向变化沿置位，ISR 倒数；0=检测使能） */
 
 static volatile float    s_fCurrMa;      /* 1ms ISR 写，主循环/GetInfo 读 */
 static volatile uint8_t  s_u8Status;     /* 0 正常 1 过流 */
@@ -34,6 +36,7 @@ void CurrentSensor_Init(void)
     s_fCurrMa = 0.0f;
     s_u8Status = 0U;
     s_u16OverMs = 0U;
+    s_u16BlockMs = 0U;
     s_fFaultMa = 0.0f;
 }
 
@@ -51,6 +54,17 @@ void CurrentSensor_Isr1ms(void)
     fCurrMa = (fVoltV - CUR_SENSOR_ZERO_V) * CUR_SENSITIVITY_MA_PER_V;  /* 差分放大器 V→mA */
 #endif
     s_fCurrMa = fCurrMa;
+
+    /* 方向变化屏蔽期（停止→正/反转、换向启动浪涌）：不判定、窗口计数清零——
+       屏蔽结束后窗口从 0 重新累计（30ms 屏蔽 + 30ms 窗口 = 最早 60ms 判过流）；
+       s_fCurrMa 已更新，monitor 仍可观察电流。屏蔽强制回正常态无副作用
+       （过流事件只发 0→1 沿，回落不发事件） */
+    if (s_u16BlockMs != 0U) {
+        s_u16BlockMs--;
+        s_u16OverMs = 0U;
+        s_u8Status = 0U;
+        return;
+    }
 
     u8Prev = s_u8Status;
     if (fCurrMa > g_cur_cfg.over_th_ma) {
@@ -77,7 +91,13 @@ void CurrentSensor_Isr1ms(void)
 void CurrentSensor_GetInfo(float *pfCurr_mA, uint8_t *pu8Status)
 {
     if (pfCurr_mA != NULL)  *pfCurr_mA = s_fCurrMa;
-    if (pu8Status != NULL) *pu8Status = s_u8Status;
+    if (pu8Status != NULL)  *pu8Status = s_u8Status;
+}
+
+void CurrentSensor_ReqBlock(uint16_t block_ms)
+{
+    /* 覆盖式置位（调用方在 GPIO 写临界区内；ISR 只读倒数） */
+    s_u16BlockMs = block_ms;
 }
 
 uint16_t CurrentSensor_GetOverMs(void)

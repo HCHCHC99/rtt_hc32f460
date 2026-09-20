@@ -8,6 +8,7 @@
 #include "dev_state.h"
 #include "dev_event_def.h"
 #include "dev_adc.h"
+#include "Task/led_task.h"  /* Led_SetOn：欠压指示灯（欠压成立沿亮，恢复沿灭，ISR 上下文可调） */
 #include <rtthread.h>
 
 
@@ -73,6 +74,7 @@ void BusVoltage_Isr1ms(void)
                     s_u8Fault = 0U;
                     s_u8Waiting = 0U;
                     s_u32RecoverCnt = 0U;
+                    Led_SetOn(0U);                     /* 欠压恢复确认：LED 灭 */
                 }
             }
         } else {
@@ -86,6 +88,7 @@ void BusVoltage_Isr1ms(void)
         } else if (fVolt < g_volt_cfg.under_th) {
             s_u8Fault = 1U;
             s_fFaultVolt = fVolt;      /* 锁存欠压触发瞬间的电压值 */
+            Led_SetOn(1U);             /* 欠压第一个检测点：LED 亮（置低），ISR 直控 */
         }
     }
     s_u8Status = s_u8Fault;

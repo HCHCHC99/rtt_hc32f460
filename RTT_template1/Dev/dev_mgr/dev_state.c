@@ -102,6 +102,12 @@ void Sys_State_Dispatch(rt_uint32_t bits)
     /* 故障事件：记录故障码后再投递（过压/欠压/过流先进 EMERGENCY，enter 末尾跳 FAULT）；
        检测在 1ms ISR 完成，打印挪到本线程上下文（ISR 不打印） */
     if (bits & EVT_SYS_OVER_CURRENT) {
+        /* 过流检测层统一打印：过流跳变沿在 ISR 锁存的触发瞬间电流（堵转/卡阻电流快照），
+           决策细节打印在 rod_calib 各分支（IGNORED / CALIB_MAX / CALIB_MIN / FAULT_FWD / FAULT_REV） */
+        POWER_PRINT("over curr detect: ma=%ld th=%ld win=%ums",
+                    (long)CurrentSensor_GetFaultMa(),
+                    (long)g_cur_cfg.over_th_ma,
+                    (unsigned)g_cur_cfg.window_ms);
         /* 软限位判定抽至 Dev/dev_rod/dev_rod_calib：
            CALIB_* = 校准窗口命中/未校准（软限位，不算故障）——本线程即时清对应方向
            允许（亚毫秒级断电，不等 rod_task 10ms 拍；rod_task 限位态入口再清一次幂等）；

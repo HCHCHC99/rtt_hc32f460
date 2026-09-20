@@ -302,7 +302,7 @@ int main(void)
         }
 #endif
 
-        rt_thread_mdelay(2000);
+        rt_thread_mdelay(1000);     /* 1s 周期（对齐 monitor_sample_1s 名称与各 1s 打印节奏） */
         monitor_sample_1s();
     }
 }

@@ -98,6 +98,7 @@ static void Param_SetDefaults(void)
 
     g_param_record.cur_over_th_ma = CUR_OVER_CUR_TH_MA_DFT;
     g_param_record.cur_window_ms  = (uint16_t)CUR_OVER_WINDOW_MS_DFT;
+    g_param_record.cur_block_ms   = (uint16_t)CUR_BLOCK_MS_DFT;
     g_param_record.hall_dir_seq   = (uint8_t)HALL_DIR_SEQ_DFT;
     g_param_record.motor_dir_seq  = (uint8_t)MOTOR_DIR_SEQ_DFT;
 
@@ -107,16 +108,23 @@ static void Param_SetDefaults(void)
     g_param_record.rod_calib_win_d = ROD_CALIB_WIN_D_DFT;
     g_param_record.rod_stop_margin = ROD_STOP_MARGIN_DFT;
 
+    g_param_record.rod_stroke_mm       = ROD_STROKE_DFT;
+    g_param_record.rod_reduction_ratio = ROD_REDUCTION_RATIO_DFT;
+    g_param_record.rod_hall_pulses     = ROD_HALL_PULSES_DFT;
+    g_param_record.rod_screw_lead      = ROD_SCREW_LEAD_DFT;
+
     Param_VoltFmt(VOL_OVER_TH_DFT, s_volt_a, sizeof(s_volt_a));
     Param_VoltFmt(VOL_UNDER_TH_DFT, s_volt_b, sizeof(s_volt_b));
     Param_VoltFmt(VOL_HYST_DFT, s_volt_c, sizeof(s_volt_c));
-    PARAM_PRINT("[PARAM] defaults set: over=%sV under=%sV hyst=%sV rec=%lums cur=%lumA win=%ums calibWin=%s/%s/%s/%s",
+    PARAM_PRINT("[PARAM] defaults set: over=%sV under=%sV hyst=%sV rec=%lums cur=%lumA win=%ums block=%ums calibWin=%s/%s/%s/%s stroke=%s",
                 s_volt_a, s_volt_b, s_volt_c,
                 (unsigned long)VOL_RECOVER_DELAY_MS_DFT,
                 (unsigned long)(CUR_OVER_CUR_TH_MA_DFT + 0.5f),
                 (unsigned)CUR_OVER_WINDOW_MS_DFT,
+                (unsigned)CUR_BLOCK_MS_DFT,
                 Dev_Param_MmFmtA(ROD_CALIB_WIN_A_DFT), Dev_Param_MmFmtA(ROD_CALIB_WIN_B_DFT),
-                Dev_Param_MmFmtA(ROD_CALIB_WIN_C_DFT), Dev_Param_MmFmtA(ROD_CALIB_WIN_D_DFT));
+                Dev_Param_MmFmtA(ROD_CALIB_WIN_C_DFT), Dev_Param_MmFmtA(ROD_CALIB_WIN_D_DFT),
+                Dev_Param_MmFmtA(ROD_STROKE_DFT));
 }
 
 /**
@@ -141,6 +149,7 @@ static void Param_ApplyToDevices(void)
 
     g_cur_cfg.over_th_ma = g_param_record.cur_over_th_ma;
     g_cur_cfg.window_ms  = g_param_record.cur_window_ms;
+    g_cur_cfg.block_ms   = g_param_record.cur_block_ms;
 
     Param_ApplyDirSeq();
 }
@@ -179,15 +188,17 @@ int32_t Dev_Param_Init(void)
         Param_VoltFmt(g_param_record.volt_over_th, s_volt_a, sizeof(s_volt_a));
         Param_VoltFmt(g_param_record.volt_under_th, s_volt_b, sizeof(s_volt_b));
         Param_VoltFmt(g_param_record.volt_hyst, s_volt_c, sizeof(s_volt_c));
-        PARAM_PRINT("[PARAM] loaded: over=%sV under=%sV hyst=%sV rec=%lums cur=%lumA win=%ums calibWin=%s/%s/%s/%s (seq=%lu)",
+        PARAM_PRINT("[PARAM] loaded: over=%sV under=%sV hyst=%sV rec=%lums cur=%lumA win=%ums block=%ums calibWin=%s/%s/%s/%s stroke=%s (seq=%lu)",
                     s_volt_a, s_volt_b, s_volt_c,
                     (unsigned long)g_param_record.volt_recover_ms,
                     (unsigned long)(g_param_record.cur_over_th_ma + 0.5f),
                     (unsigned)g_param_record.cur_window_ms,
+                    (unsigned)g_param_record.cur_block_ms,
                     Dev_Param_MmFmtA(g_param_record.rod_calib_win_a),
                     Dev_Param_MmFmtA(g_param_record.rod_calib_win_b),
                     Dev_Param_MmFmtA(g_param_record.rod_calib_win_c),
                     Dev_Param_MmFmtA(g_param_record.rod_calib_win_d),
+                    Dev_Param_MmFmtA(g_param_record.rod_stroke_mm),
                     (unsigned long)g_param_record.sequence_id);
     } else {
         MAIN_D("[PARAM] init FAILED res=%d (keep RAM defaults)", (int)res);
@@ -222,6 +233,7 @@ int32_t Dev_Param_Save(void)
     g_param_record.volt_recover_ms = g_volt_cfg.recover_ms;
     g_param_record.cur_over_th_ma  = g_cur_cfg.over_th_ma;
     g_param_record.cur_window_ms   = g_cur_cfg.window_ms;
+    g_param_record.cur_block_ms    = g_cur_cfg.block_ms;
 
     res = Param_Save(&s_param_config, &s_param_runtime);
     if (res != PARAM_OK) {
@@ -300,8 +312,9 @@ static void cmd_param_show(void)
     Param_VoltFmt(g_volt_cfg.hyst, s_volt_c, sizeof(s_volt_c));
     MAIN_D("[PARAM] volt: over=%sV under=%sV hyst=%sV rec=%lums",
            s_volt_a, s_volt_b, s_volt_c, (unsigned long)g_volt_cfg.recover_ms);
-    MAIN_D("[PARAM] cur: over=%lumA win=%ums",
-           (unsigned long)(g_cur_cfg.over_th_ma + 0.5f), (unsigned)g_cur_cfg.window_ms);
+    MAIN_D("[PARAM] cur: over=%lumA win=%ums block=%ums",
+           (unsigned long)(g_cur_cfg.over_th_ma + 0.5f), (unsigned)g_cur_cfg.window_ms,
+           (unsigned)g_cur_cfg.block_ms);
     Param_VoltFmt(g_param_record.rod_stop_margin, s_volt_a, sizeof(s_volt_a)); /* 借电压缓冲（同 MmFmtA 格式，避开 4 缓冲轮转上限） */
     MAIN_D("[PARAM] rod calibWin: a=%s b=%s c=%s d=%s stopMargin=%s",
            Dev_Param_MmFmtA(g_param_record.rod_calib_win_a),
@@ -309,6 +322,11 @@ static void cmd_param_show(void)
            Dev_Param_MmFmtA(g_param_record.rod_calib_win_c),
            Dev_Param_MmFmtA(g_param_record.rod_calib_win_d),
            s_volt_a);
+    MAIN_D("[PARAM] rod mech: stroke=%s ratio=%lu pulses=%lu lead=%lu (unit=deg)",
+           Dev_Param_MmFmtA(g_param_record.rod_stroke_mm),
+           (unsigned long)(g_param_record.rod_reduction_ratio + 0.5f),
+           (unsigned long)(g_param_record.rod_hall_pulses + 0.5f),
+           (unsigned long)(g_param_record.rod_screw_lead + 0.5f));
     MAIN_D("[PARAM] dir: hall=%u motor=%u",
            (unsigned)g_param_record.hall_dir_seq,
            (unsigned)g_param_record.motor_dir_seq);

@@ -142,11 +142,26 @@ void Dev_Param_RodApply(RodPosition_t *pos)
     pos->calib_win_c = g_param_record.rod_calib_win_c;
     pos->calib_win_d = g_param_record.rod_calib_win_d;
     pos->stop_margin_mm = g_param_record.rod_stop_margin;
+
+    /* 机械参数（A 块数据，覆盖 App_Model_Init 的 DFT 宏初值）：pulse->角度换算与行程
+       以 flash 配置为准（换机型/减速比改参数重新保存即可，不改代码） */
+    RodPosition_SetParams(pos,
+                          g_param_record.rod_stroke_mm,
+                          g_param_record.rod_reduction_ratio,
+                          g_param_record.rod_hall_pulses,
+                          g_param_record.rod_screw_lead);
+
     Rod_MmFmt(pos->stop_margin_mm, s_mm_a, sizeof(s_mm_a)); /* 借本地缓冲，避开 MmFmtA 4 缓冲轮转上限 */
     PARAM_PRINT("[RODP] calibWin a=%s b=%s c=%s d=%s stopMargin=%s",
                 Dev_Param_MmFmtA(pos->calib_win_a), Dev_Param_MmFmtA(pos->calib_win_b),
                 Dev_Param_MmFmtA(pos->calib_win_c), Dev_Param_MmFmtA(pos->calib_win_d),
                 s_mm_a);
+    Rod_MmFmt(g_param_record.rod_stroke_mm, s_mm_a, sizeof(s_mm_a));
+    PARAM_PRINT("[RODP] mech: stroke=%s ratio=%lu pulses=%lu lead=%lu (unit=deg)",
+                s_mm_a,
+                (unsigned long)(g_param_record.rod_reduction_ratio + 0.5f),
+                (unsigned long)(g_param_record.rod_hall_pulses + 0.5f),
+                (unsigned long)(g_param_record.rod_screw_lead + 0.5f));
 
     /* 上电无有效块（默认值路径）：不接管校准，保持原校准流程 */
     if (s_rod_defaults_written != 0U) {
