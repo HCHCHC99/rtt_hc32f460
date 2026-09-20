@@ -131,6 +131,8 @@ static const ParamDesc_t s_param_table[] = {
     { "volt_under", PARAM_REC_OFF(volt_under_th),      (void *)&g_volt_cfg,            offsetof(VoltCfg_t, under_th),   PARAM_T_F32, .def_f = VOL_UNDER_TH_DFT,  .min = VOL_UNDER_TH_MIN, .max = VOL_UNDER_TH_MAX },
     { "volt_hyst",  PARAM_REC_OFF(volt_hyst),          (void *)&g_volt_cfg,            offsetof(VoltCfg_t, hyst),       PARAM_T_F32, .def_f = VOL_HYST_DFT,      .min = VOL_HYST_MIN, .max = VOL_HYST_MAX },
     { "volt_rec",   PARAM_REC_OFF(volt_recover_ms),    (void *)&g_volt_cfg,            offsetof(VoltCfg_t, recover_ms), PARAM_T_U32, .def_u = VOL_RECOVER_DELAY_MS_DFT, .min = VOL_RECOVER_DELAY_MS_MIN, .max = VOL_RECOVER_DELAY_MS_MAX },
+    { "volt_over_ms", PARAM_REC_OFF(volt_over_ms),     (void *)&g_volt_cfg,            offsetof(VoltCfg_t, over_ms),    PARAM_T_U32, .def_u = VOL_OVER_MS_DFT,   .min = VOL_OVER_MS_MIN, .max = VOL_OVER_MS_MAX },
+    { "volt_under_ms",PARAM_REC_OFF(volt_under_ms),    (void *)&g_volt_cfg,            offsetof(VoltCfg_t, under_ms),   PARAM_T_U32, .def_u = VOL_UNDER_MS_DFT,  .min = VOL_UNDER_MS_MIN, .max = VOL_UNDER_MS_MAX },
     { "cur_th",     PARAM_REC_OFF(cur_over_th_ma),     (void *)&g_cur_cfg,             offsetof(CurCfg_t, over_th_ma),  PARAM_T_F32, .def_f = CUR_OVER_CUR_TH_MA_DFT, .min = CUR_OVER_CUR_TH_MA_MIN, .max = CUR_OVER_CUR_TH_MA_MAX },
     { "cur_win",    PARAM_REC_OFF(cur_window_ms),      (void *)&g_cur_cfg,             offsetof(CurCfg_t, window_ms),   PARAM_T_U16, .def_u = CUR_OVER_WINDOW_MS_DFT, .min = CUR_OVER_WINDOW_MS_MIN, .max = CUR_OVER_WINDOW_MS_MAX },
     { "cur_block",  PARAM_REC_OFF(cur_block_ms),       (void *)&g_cur_cfg,             offsetof(CurCfg_t, block_ms),    PARAM_T_U16, .def_u = CUR_BLOCK_MS_DFT,  .min = CUR_BLOCK_MS_MIN, .max = CUR_BLOCK_MS_MAX },
@@ -154,11 +156,13 @@ static const ParamDesc_t s_param_table[] = {
  * 规则：表加/改一行，此处同步加/改一行；字段改名或宽度变化会直接编译失败
  * （断言宏 PARAM_STATIC_ASSERT / PARAM_TYPE_SIZE 定义在 dev_param.h）
  *============================================================================*/
-/* A 块记录字段宽度（与表 18 行一一对应） */
+/* A 块记录字段宽度（与表 20 行一一对应） */
 PARAM_STATIC_ASSERT(sizeof(((ParamRecord_t *)0)->volt_over_th)        == PARAM_TYPE_SIZE(PARAM_T_F32));
 PARAM_STATIC_ASSERT(sizeof(((ParamRecord_t *)0)->volt_under_th)       == PARAM_TYPE_SIZE(PARAM_T_F32));
 PARAM_STATIC_ASSERT(sizeof(((ParamRecord_t *)0)->volt_hyst)           == PARAM_TYPE_SIZE(PARAM_T_F32));
 PARAM_STATIC_ASSERT(sizeof(((ParamRecord_t *)0)->volt_recover_ms)     == PARAM_TYPE_SIZE(PARAM_T_U32));
+PARAM_STATIC_ASSERT(sizeof(((ParamRecord_t *)0)->volt_over_ms)        == PARAM_TYPE_SIZE(PARAM_T_U32));
+PARAM_STATIC_ASSERT(sizeof(((ParamRecord_t *)0)->volt_under_ms)       == PARAM_TYPE_SIZE(PARAM_T_U32));
 PARAM_STATIC_ASSERT(sizeof(((ParamRecord_t *)0)->cur_over_th_ma)      == PARAM_TYPE_SIZE(PARAM_T_F32));
 PARAM_STATIC_ASSERT(sizeof(((ParamRecord_t *)0)->cur_window_ms)       == PARAM_TYPE_SIZE(PARAM_T_U16));
 PARAM_STATIC_ASSERT(sizeof(((ParamRecord_t *)0)->cur_block_ms)        == PARAM_TYPE_SIZE(PARAM_T_U16));
@@ -178,6 +182,8 @@ PARAM_STATIC_ASSERT(sizeof(((VoltCfg_t *)0)->over_th)      == PARAM_TYPE_SIZE(PA
 PARAM_STATIC_ASSERT(sizeof(((VoltCfg_t *)0)->under_th)     == PARAM_TYPE_SIZE(PARAM_T_F32));
 PARAM_STATIC_ASSERT(sizeof(((VoltCfg_t *)0)->hyst)         == PARAM_TYPE_SIZE(PARAM_T_F32));
 PARAM_STATIC_ASSERT(sizeof(((VoltCfg_t *)0)->recover_ms)   == PARAM_TYPE_SIZE(PARAM_T_U32));
+PARAM_STATIC_ASSERT(sizeof(((VoltCfg_t *)0)->over_ms)      == PARAM_TYPE_SIZE(PARAM_T_U32));
+PARAM_STATIC_ASSERT(sizeof(((VoltCfg_t *)0)->under_ms)     == PARAM_TYPE_SIZE(PARAM_T_U32));
 PARAM_STATIC_ASSERT(sizeof(((CurCfg_t *)0)->over_th_ma)    == PARAM_TYPE_SIZE(PARAM_T_F32));
 PARAM_STATIC_ASSERT(sizeof(((CurCfg_t *)0)->window_ms)     == PARAM_TYPE_SIZE(PARAM_T_U16));
 PARAM_STATIC_ASSERT(sizeof(((CurCfg_t *)0)->block_ms)      == PARAM_TYPE_SIZE(PARAM_T_U16));
@@ -486,7 +492,7 @@ void Dev_Param_FillTest(void)
     uint32_t remain;
 
     /* 连续保存，直到当前扇区剩余空间只够再存两组（之后再存将走擦除/换扇区路径）。
-       500 组为保险上限，正常单扇区最多 8192/44 ≈ 186 组，条件本身不会跨扇区。 */
+       500 组为保险上限，正常单扇区最多 8192/92 ≈ 89 组，条件本身不会跨扇区。 */
     while (((s_param_runtime.curr_sec + 1U) * PARAM_SECTOR_SIZE - s_param_runtime.curr_addr)
            > (2U * sizeof(ParamRecord_t))) {
         if (Dev_Param_Save() != PARAM_OK) {

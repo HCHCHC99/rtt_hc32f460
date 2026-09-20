@@ -1,6 +1,6 @@
 /**
  * @file    dev_bus_voltage.c
- * @brief   母线电压设备：读 10ms 滑动均值→过压/欠压（迟滞 + 恢复延时，1ms ISR 检测）
+ * @brief   母线电压设备：读 10ms 滑动均值→过压/欠压（迟滞 + 确认窗 + 恢复延时，1ms ISR 检测）
  */
 #include "dev_bus_voltage.h"
 #include "dev_param.h"      /* VOL_*_DFT 存储默认值（单点） */
@@ -8,13 +8,14 @@
 #include "dev_state.h"
 #include "dev_event_def.h"
 #include "dev_adc.h"
-#include "Task/led_task.h"  /* Led_SetOn：欠压指示灯（欠压成立沿亮，恢复沿灭，ISR 上下文可调） */
+#include "Task/led_task.h"  /* Led_SetOn：欠压指示灯（1ms 实时跟踪欠压阈值，ISR 上下文可调） */
 #include <rtthread.h>
 
 
 /* 阈值配置全局变量（类型/声明见 dev_bus_voltage.h；debugger 改 g_volt_cfg 实时生效） */
 volatile VoltCfg_t g_volt_cfg = {
     VOL_OVER_TH_DFT, VOL_UNDER_TH_DFT, VOL_HYST_DFT, VOL_RECOVER_DELAY_MS_DFT,
+    VOL_OVER_MS_DFT, VOL_UNDER_MS_DFT,
 };
 volatile uint32_t g_volt_sim_mv = 21500U;   /* 模拟母线电压 mV（VOLT_SIM_MODE_EN=1 时生效） */
 
@@ -24,7 +25,10 @@ static volatile uint8_t s_u8SeenValid; /* 本次 MCU 上电后曾见有效母线
 static uint8_t s_u8Fault;
 static uint8_t s_u8Waiting;
 static uint32_t s_u32RecoverCnt;       /* 恢复延时累计 ms（仅 ISR） */
+static uint32_t s_u32OverCnt;          /* 过压确认窗连续计数 ms（仅 ISR） */
+static uint32_t s_u32UnderCnt;         /* 欠压确认窗连续计数 ms（仅 ISR） */
 static volatile float   s_fFaultVolt;  /* 故障触发瞬间的电压快照 V（ISR 写，sys_sm 打印读） */
+static volatile uint8_t s_u8BelowTh;   /* 最新采样低于欠压阈值标志（ISR 写，led 线程兜底轮询读） */
 
 
 
@@ -35,6 +39,8 @@ void BusVoltage_Init(void)
     s_u8Fault = 0U;
     s_u8Waiting = 0U;
     s_u32RecoverCnt = 0U;
+    s_u32OverCnt = 0U;
+    s_u32UnderCnt = 0U;
     s_fFaultVolt = 0.0f;
 }
 
@@ -51,6 +57,11 @@ void BusVoltage_Isr1ms(void)
     fVolt += (VOL_OFFSET * 0.001f);      /* 偏置补偿：+1.2V（仅本模块，不影响 ADC 层） */
 #endif
     s_fVolt = fVolt;
+
+    /* 欠压指示灯：1ms 实时跟踪欠压阈值——低于亮 / 高于灭（与确认窗、恢复延时无关；
+       上电无母线时 0V<阈值 常亮，属预期行为）。同值重写无害（单脚寄存器写）。 */
+    s_u8BelowTh = (fVolt < g_volt_cfg.under_th) ? 1U : 0U;
+    Led_SetOn(s_u8BelowTh);
 
     /* 有效母线判据与欠压恢复判据一致：高于欠压阈值 + 迟滞（即欠压已退出）。
        只置 1、不在 IDLE 清零，用于区分"调试无母线冷启动"和"真实掉电"（欠压存行程门控用）。 */
@@ -74,7 +85,7 @@ void BusVoltage_Isr1ms(void)
                     s_u8Fault = 0U;
                     s_u8Waiting = 0U;
                     s_u32RecoverCnt = 0U;
-                    Led_SetOn(0U);                     /* 欠压恢复确认：LED 灭 */
+                    /* LED 不在此控制：由上方 1ms 阈值实时跟踪（回正常区即灭） */
                 }
             }
         } else {
@@ -83,12 +94,26 @@ void BusVoltage_Isr1ms(void)
         }
     } else {
         if (fVolt > g_volt_cfg.over_th) {
-            s_u8Fault = 2U;
-            s_fFaultVolt = fVolt;      /* 锁存过压触发瞬间的电压值 */
+            s_u32UnderCnt = 0U;
+            s_u32OverCnt++;
+            if (s_u32OverCnt >= g_volt_cfg.over_ms) {   /* 确认窗：连续超限 N ms（0=单点立即） */
+                s_u8Fault = 2U;
+                s_fFaultVolt = fVolt;      /* 锁存过压触发瞬间的电压值 */
+                s_u32OverCnt = 0U;
+                s_u32UnderCnt = 0U;
+            }
         } else if (fVolt < g_volt_cfg.under_th) {
-            s_u8Fault = 1U;
-            s_fFaultVolt = fVolt;      /* 锁存欠压触发瞬间的电压值 */
-            Led_SetOn(1U);             /* 欠压第一个检测点：LED 亮（置低），ISR 直控 */
+            s_u32OverCnt = 0U;
+            s_u32UnderCnt++;
+            if (s_u32UnderCnt >= g_volt_cfg.under_ms) {
+                s_u8Fault = 1U;
+                s_fFaultVolt = fVolt;      /* 锁存欠压触发瞬间的电压值 */
+                s_u32OverCnt = 0U;
+                s_u32UnderCnt = 0U;
+            }
+        } else {
+            s_u32OverCnt = 0U;             /* 回到正常区：确认计数清零 */
+            s_u32UnderCnt = 0U;
         }
     }
     s_u8Status = s_u8Fault;
@@ -120,6 +145,11 @@ uint8_t BusVoltage_IsUnderVoltage(void)
 uint8_t BusVoltage_HasSeenValid(void)
 {
     return (s_u8SeenValid != 0U) ? 1U : 0U;
+}
+
+uint8_t BusVoltage_IsBelowUnderTh(void)
+{
+    return (s_u8BelowTh != 0U) ? 1U : 0U;
 }
 
 float BusVoltage_GetFaultVolt(void)

@@ -7,11 +7,16 @@
 #define __HC32_DRV_ADC_H__
 
 #include "hc32_ll.h"
+#include "Dev/dev_adc/dev_adc_ops.h"   /* ADC_MEAN_WINDOW_MS：滑动窗口时长（实现依赖接口） */
 #include <stdint.h>
 #include <stdbool.h>
 
 /* ============ 采样触发：TMR0_1 CH_B 硬件触发 + AOS 事件路由 ============ */
 #define ADC_SAMPLE_INTERVAL_US      (500U)            /* 采样间隔 500us = 2kHz */
+/* 滑动均值窗口点数 = 窗口时长/采样间隔（10ms/500us=20 点）。
+   ⚠ 先乘后除：若写成 (MS*1000/INTERVAL) 以外的形式如 (10/INTERVAL*1000)，
+   整数除法 10/500=0 截断，数组长度为 0 直接编译错 */
+#define ADC_MEAN_WINDOW_SAMPLES     (ADC_MEAN_WINDOW_MS * 1000U / ADC_SAMPLE_INTERVAL_US)
 #define ADC_TRIG_TMR_UNIT           (CM_TMR0_1)
 #define ADC_TRIG_TMR_CH             (TMR0_CH_B)
 #define ADC_TRIG_TMR_CLK            (FCG2_PERIPH_TMR0_1)

@@ -1,7 +1,7 @@
 # Flash 存储模块设计（移植版·双实例）
 
 > 记录日期：2026-09-08（同日升级双实例并重构保存链路：Rod_Task 驱动 + 依赖注入）
-> 更新：2026-09-20 A 块参数改**表驱动存储**（新增 §3.4）：记录 44B→84B，新增 param_list/param_set 命令与越界校验；**布局变更，首次烧录需 param_erase**
+> 更新：2026-09-20 A 块参数改**表驱动存储**（新增 §3.4）：记录 44B→84B，新增 param_list/param_set 命令与越界校验；同日新增过/欠压确认窗参数 volt_over_ms/volt_under_ms（记录 84B→92B，追加 97→89）；**布局变更，首次烧录需 param_erase**
 > 状态：✅ 已实施；A 块扇区内循环 + 磨损换扇区已实测通过；B 块待上板验证
 > 来源：裸机工程 `D:\HB_chuchai_v.6.0.4`（hc32f46x_flash / param_manager / App_Params），芯片同为 HC32F460
 > 流程图：`ob/Flash慢块A流程图.canvas`、`ob/Flash快块B流程图.canvas`（Obsidian）
@@ -31,7 +31,7 @@
 applications/main.c        上电调 Dev_Param_Init()（一次性，A/B 扫描加载的编排入口）
         │
 Dev/dev_param/             应用层：双实例
-  ├─ dev_param.c           慢块 A：ParamRecord_t(84B) 表驱动（s_param_table 单点描述，
+  ├─ dev_param.c           慢块 A：ParamRecord_t(92B) 表驱动（s_param_table 单点描述，
   │                        defaults/apply/save/show 统一遍历，见 §3.4）
   │                        （兼编排角色：Init/EraseAll/param_show 统一调度 A+B）
   └─ dev_param_rod.c       快块 B：ParamStrokeRecord_t(24B) + 保存链路自包含
@@ -52,7 +52,7 @@ hc32_ll_efm.c（DDL）        已在构建中（无需改 .cproject）
 
 | 实例 | 扇区 | 地址范围 | 记录大小 | 追加次数/擦 | 擦寿命/扇区 | 保存总寿命 |
 |---|---|---|---|---|---|---|
-| **A 慢块**（配置） | 62→61（2 个） | 0x7A000~0x7FFFF | 84B | 97 | 1 万擦 | 97 万/扇区 × 2 |
+| **A 慢块**（配置） | 62→61（2 个） | 0x7A000~0x7FFFF | 92B | 89 | 1 万擦 | 89 万/扇区 × 2 |
 | **B 快块**（行程） | 60→51（10 个） | 0x66000~0x79FFF | 24B | **341** | 1 万擦 | 341 万/扇区 × 10 |
 
 - 扇区号 = 绝对地址 / 0x2000（`PARAM_SECTOR_SIZE`）；两块无重叠；app 区可用至 0x65FFF（416KB），当前固件 ~82KB
@@ -112,14 +112,14 @@ hc32_ll_efm.c（DDL）        已在构建中（无需改 .cproject）
 时序契约：上电首次 Apply 时 rod 模块未 init，`Dev_Param_RodApply` 内 `s_rod_inited` 守卫直接跳过，实际应用由 `App_Model_Init` 末尾补做（与表驱动前时序一致）。
 
 **三道防线**：
-1. **编译期**：26 条 `PARAM_STATIC_ASSERT`（18 记录字段 + 7 消费字段 + 1 变量）逐行核对"表行 type 声明 ↔ 字段实际宽度"——type 标错、字段改名/改宽直接编译失败；另有记录 ≤256B 引擎上限 + 4 字节对齐两条老断言
+1. **编译期**：30 条 `PARAM_STATIC_ASSERT`（20 记录字段 + 9 消费字段 + 1 变量）逐行核对"表行 type 声明 ↔ 字段实际宽度"——type 标错、字段改名/改宽直接编译失败；另有记录 ≤256B 引擎上限 + 4 字节对齐两条老断言
 2. **param_set 运行时**：越界**拒收**并打印 `[PARAM_WARNNING]`（自带 `====` 分隔线，仅出错时输出，开关 `PARAM_WARNNING_PRINT_EN`）
 3. **上电加载**：Flash 旧值越界**仅告警不裁剪**（提示 param_erase），不替用户做主
 
 **MSH 命令**：`param_list`（当前值/默认值/限值一行一参）、`param_set <name> <value>`（按名热改 → 钩子即时生效，`param_save` 持久化）。
 
 **注意点 / 坑**：
-- **改 ParamRecord_t 布局 = 换存储格式**：旧记录 CRC 不过 → 上电自动走默认值路径，不会加载错值；但本次 44B→84B 后首次烧录必须 `param_erase` 清掉旧扇区数据
+- **改 ParamRecord_t 布局 = 换存储格式**：旧记录 CRC 不过 → 上电自动走默认值路径，不会加载错值；但布局变更（44B→84B→92B）后首次烧录必须 `param_erase` 清掉旧扇区数据
 - 表驱动后断点调试不如直写直观：追 apply/save 行为要进表遍历跳一层间接
 - `PARAM_TABLE_NUM` 是唯一留在 .c 的宏（依赖 static 表定义，无法上移 .h——开发规范 §11 特例）
 - **编译顺序**：`Param_SetDefaults` 引用 `PARAM_TABLE_NUM`（宏依赖 `s_param_table`），函数定义必须放在表之后，否则 implicit declaration / undeclared（已踩，见 §八 第 8 条）
@@ -201,7 +201,7 @@ Dev_Param_RodPollSave(): 计 2 个 tick ≈ 20ms（等刹车滑行稳定，零�
 
 ```text
 慢块 A: savelabel = 1   修改 over_th(+0.5V 回绕 [23,27)) 并保存一组
-        savelabel = 2   连续保存填满 A 当前扇区（~186 组）
+        savelabel = 2   连续保存填满 A 当前扇区（~89 组）
 快块 B: savelabel = 3   保存当前推杆行程一组（main 内组合 RodSave+取值）
         savelabel = 4   连续保存填满 B 当前扇区（~341 组）
 ```

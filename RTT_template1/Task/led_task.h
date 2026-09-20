@@ -1,7 +1,7 @@
 /**
  * @file    led_task.h
- * @brief   LED 任务：欠压指示灯。上电常灭；欠压检测成立沿由 BusVoltage ISR 直控点亮
- *          （1ms 级，第一个欠压检测点），恢复后灭；led 线程 1s 轮询兜底同步。
+ * @brief   LED 任务：欠压指示灯。电压检测 ISR 每 1ms 实时直控（低于欠压阈值亮/
+ *          高于灭，上电无母线时 0V<阈值 常亮属预期）；led 线程 1s 轮询兜底同步。
  *          LED 极性：亮 = 置低，灭 = 置高。
  */
 #ifndef __LED_TASK_H__

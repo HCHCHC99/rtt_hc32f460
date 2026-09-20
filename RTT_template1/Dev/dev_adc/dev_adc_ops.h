@@ -8,8 +8,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-/* 滑动平均窗口点数：10ms @ 2kHz（采样间隔 500us） */
-#define ADC_MEAN_WINDOW_SAMPLES     (20U)
+/* 滑动平均窗口时长 ms（芯片无关语义；点数由实现层按采样间隔换算，见 Adp/hc32_drv_adc.h） */
+#define ADC_MEAN_WINDOW_MS          (10U)
 
 /* 通用 ADC 通道配置（芯片无关，只含换算；端口/引脚由实现层映射） */
 typedef struct {

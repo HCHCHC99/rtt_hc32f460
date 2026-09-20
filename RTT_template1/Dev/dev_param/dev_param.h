@@ -3,7 +3,7 @@
  * @brief   应用参数管理（param_manager 双实例）：慢块 A（配置参数）+ 快块 B（推杆行程）
  * @note    - 慢块 A：g_volt_cfg / g_cur_cfg 配置 + 软限位校准窗口 + 停止裕量 + 推杆机械
  *            参数（stroke/ratio/pulses/lead），改动少，secStart=62 / secEnd=61
- *            （0x7C000 起逆序，2 扇区），84B 记录，97 次/擦/扇区；
+ *            （0x7C000 起逆序，2 扇区），92B 记录，89 次/擦/扇区；
  *          - 快块 B：推杆当前行程，欠压急停时保存停车位置，secStart=60 / secEnd=51（0x78000
  *            起逆序，10 扇区），24B 记录，341 次/擦/扇区；
  *          - Dev_Param_Init() 上电由 main 调一次（扫 Flash 加载或写默认值，内部统一初始化
@@ -19,7 +19,7 @@
 #include "Dev/dev_rod/dev_rod_position.h"
 
 /*=============================================================================
- * 慢块 A（配置参数）：60B 记录
+ * 慢块 A（配置参数）：92B 记录
  *=============================================================================*/
 
 /* Flash 存储参数记录结构体（布局即存储布局，修改需谨慎；4 字节对齐） */
@@ -35,6 +35,8 @@ typedef struct {
     float    volt_under_th;     /* 欠压阈值 V */
     float    volt_hyst;         /* 迟滞回差 V */
     uint32_t volt_recover_ms;   /* 恢复延时 ms */
+    uint32_t volt_over_ms;      /* 过压确认窗 ms：连续超限 N ms 才判故障（0=单点立即） */
+    uint32_t volt_under_ms;     /* 欠压确认窗 ms：连续低于阈值 N ms 才判故障（0=单点立即） */
 
     /* 电流传感器配置 (CurCfg_t) */
     float    cur_over_th_ma;    /* 过流阈值 mA */
@@ -80,9 +82,6 @@ extern ParamRecord_t g_param_record;
 #define PARAM_ROD_MAGIC_HEAD    0x66AA66AAU
 #define PARAM_ROD_MAGIC_TAIL    0xAA66AA66U
 
-/* 欠压急停保存行程前的固定延时 ms：等推杆刹车滑行稳定（欠压掉电余量实测 270ms） */
-#define DEV_PARAM_ROD_SAVE_DELAY_MS  20U
-
 /* 快块记录：头尾 20B（引擎必需）+ 行程 float 4B = 24B，单扇区 8192/24 ≈ 341 次/擦 */
 #pragma pack(4)
 typedef struct {
@@ -110,7 +109,9 @@ typedef struct {
 #define VOL_OVER_TH_DFT             (26.0f)   /* 过压阈值 V */
 #define VOL_UNDER_TH_DFT            (20.0f)   /* 欠压阈值 V（必须明显高于 VOL_OFFSET 1.2V 偏置，否则无 24V 时 SeenValid 误判） */
 #define VOL_HYST_DFT                (1.0f)    /* 迟滞回差 V */
-#define VOL_RECOVER_DELAY_MS_DFT    (500U)    /* 电压恢复延时 ms */
+#define VOL_RECOVER_DELAY_MS_DFT    (25U)    /* 电压恢复延时 ms */
+#define VOL_OVER_MS_DFT             (12U)     /* 过压确认窗 ms：连续超限 N ms 才判故障（0=单点立即） */
+#define VOL_UNDER_MS_DFT            (12U)     /* 欠压确认窗 ms：连续低于阈值 N ms 才判故障（0=单点立即） */
 
 #define CUR_OVER_CUR_TH_MA_DFT      (1000.0f) /* 过流阈值 mA（直线推杆堵转判定，1.0A） */
 #define CUR_OVER_WINDOW_MS_DFT      (30U)     /* 过流判定窗口 ms（连续 30ms 超阈值才判过流） */
@@ -149,6 +150,10 @@ typedef struct {
 #define VOL_HYST_MAX                (5.0f)
 #define VOL_RECOVER_DELAY_MS_MIN    (0U)      /* 恢复延时限值 ms */
 #define VOL_RECOVER_DELAY_MS_MAX    (10000U)
+#define VOL_OVER_MS_MIN             (0U)      /* 过压确认窗限值 ms（0=单点立即） */
+#define VOL_OVER_MS_MAX             (100U)    /* 上限兼顾欠压掉电链路：确认窗+急停+存行程须 << 270ms 掉电余量 */
+#define VOL_UNDER_MS_MIN            (0U)      /* 欠压确认窗限值 ms（0=单点立即） */
+#define VOL_UNDER_MS_MAX            (100U)
 #define CUR_OVER_CUR_TH_MA_MIN      (100.0f)  /* 过流阈值限值 mA */
 #define CUR_OVER_CUR_TH_MA_MAX      (5000.0f)
 #define CUR_OVER_WINDOW_MS_MIN      (5U)      /* 过流判定窗口限值 ms */
