@@ -68,6 +68,10 @@ typedef struct {
 /* 存储记录全局可见（dev_param_rod.c 恢复/保存链路直接读取） */
 extern ParamRecord_t g_param_record;
 
+/* 慢块 A 存储扇区：0x7C000 起逆序使用（sec 62 → 61，2 扇区；0x78000~0x79FFF 以下归快块 B） */
+#define PARAM_SEC_START             (62U)     /* 磨损均衡区起始扇区号（扇区号 = 地址 / 0x2000） */
+#define PARAM_SEC_END               (61U)     /* 磨损均衡区结束扇区号 */
+
 /*=============================================================================
  * 快块 B（推杆行程）：24B 记录
  *============================================================================*/
@@ -90,6 +94,13 @@ typedef struct {
     uint32_t tail_magic;        /* 尾部魔数 (0xAA66AA66) */
 } ParamStrokeRecord_t;
 #pragma pack()
+
+/* 快块 B 存储扇区：0x78000 起逆序使用（sec 60 → 51，10 扇区） */
+#define ROD_SEC_START               (60U)     /* 磨损均衡区起始扇区号 */
+#define ROD_SEC_END                 (51U)     /* 磨损均衡区结束扇区号 */
+/* 欠压保存延时 tick 数：Rod_Task 10ms 周期 × 2 ≈ 20ms（等刹车滑行稳定；
+   欠压掉电余量实测 270ms，flash 纯写 ~0.3ms、扇区满含擦 ~8ms，均在余量内） */
+#define ROD_SAVE_WAIT_TICKS         (2U)
 
 /*=============================================================================
  * 存储默认值宏（单点）：A 块全部默认值 + B 块行程默认值。
@@ -126,7 +137,70 @@ typedef struct {
 #define HALL_DIR_SEQ_DFT            (0U)      /* 霍尔判向：0=标准(B沿采样A,A高=FWD) 1=反置 */
 #define MOTOR_DIR_SEQ_DFT           (0U)      /* 电机输出：0=FWD→PB8伸出 1=交换FWD/REV */
 
+/*=============================================================================
+ * 参数热改限值（param_set 越界拒收 + 上电加载越界告警；编译期策略，不入 Flash 布局）
+ * 注意：只做单参数上下限校验，跨字段约束（欠压<过压-迟滞、校准窗≤stroke 等）不在此校验
+ *=============================================================================*/
+#define VOL_OVER_TH_MIN             (22.0f)   /* 过压阈值限值 V */
+#define VOL_OVER_TH_MAX             (30.0f)
+#define VOL_UNDER_TH_MIN            (15.0f)   /* 欠压阈值限值 V（须低于过压阈值，跨字段不校验） */
+#define VOL_UNDER_TH_MAX            (24.0f)
+#define VOL_HYST_MIN                (0.0f)    /* 迟滞回差限值 V */
+#define VOL_HYST_MAX                (5.0f)
+#define VOL_RECOVER_DELAY_MS_MIN    (0U)      /* 恢复延时限值 ms */
+#define VOL_RECOVER_DELAY_MS_MAX    (10000U)
+#define CUR_OVER_CUR_TH_MA_MIN      (100.0f)  /* 过流阈值限值 mA */
+#define CUR_OVER_CUR_TH_MA_MAX      (5000.0f)
+#define CUR_OVER_WINDOW_MS_MIN      (5U)      /* 过流判定窗口限值 ms */
+#define CUR_OVER_WINDOW_MS_MAX      (200U)
+#define CUR_BLOCK_MS_MIN            (0U)      /* 方向变化屏蔽限值 ms（0=不屏蔽） */
+#define CUR_BLOCK_MS_MAX            (200U)
+#define HALL_DIR_SEQ_MIN            (0U)      /* 霍尔相序限值 */
+#define HALL_DIR_SEQ_MAX            (1U)
+#define MOTOR_DIR_SEQ_MIN           (0U)      /* 电机相序限值 */
+#define MOTOR_DIR_SEQ_MAX           (1U)
+#define ROD_CALIB_WIN_A_MIN         (0.0f)    /* 校准窗 a 限值 mm（与 stroke 的关系不在此校验） */
+#define ROD_CALIB_WIN_A_MAX         (1000.0f)
+#define ROD_CALIB_WIN_B_MIN         (0.0f)    /* 校准窗 b 限值 mm */
+#define ROD_CALIB_WIN_B_MAX         (1000.0f)
+#define ROD_CALIB_WIN_C_MIN         (0.0f)    /* 校准窗 c 限值 mm */
+#define ROD_CALIB_WIN_C_MAX         (1000.0f)
+#define ROD_CALIB_WIN_D_MIN         (0.0f)    /* 校准窗 d 限值 mm */
+#define ROD_CALIB_WIN_D_MAX         (1000.0f)
+#define ROD_STOP_MARGIN_MIN         (0.0f)    /* 停止裕量限值 mm */
+#define ROD_STOP_MARGIN_MAX         (10.0f)
+#define ROD_STROKE_MIN              (1.0f)    /* 行程限值 mm */
+#define ROD_STROKE_MAX              (1000.0f)
+#define ROD_REDUCTION_RATIO_MIN     (1.0f)    /* 减速比限值 */
+#define ROD_REDUCTION_RATIO_MAX     (10000.0f)
+#define ROD_HALL_PULSES_MIN         (1.0f)    /* 每转脉冲数限值 */
+#define ROD_HALL_PULSES_MAX         (1024.0f)
+#define ROD_SCREW_LEAD_MIN          (0.1f)    /* 导程限值 mm */
+#define ROD_SCREW_LEAD_MAX          (100.0f)
+
 #define PARAM_ROD_STROKE_DFT        (0.0f)    /* 快块 B 行程默认 mm（0=无有效块走首次校准） */
+
+/*=============================================================================
+ * 表驱动工具（dev_param.c 参数表与编译期断言用，可跨模块复用）
+ *=============================================================================*/
+
+/* 表参数类型编码（宽度由 PARAM_TYPE_SIZE 唯一决定） */
+typedef enum {
+    PARAM_T_F32 = 0,
+    PARAM_T_U32,
+    PARAM_T_U16,
+    PARAM_T_U8,
+} ParamType_t;
+
+/* 类型宽度（编译期常量版） */
+#define PARAM_TYPE_SIZE(t) \
+    ((((t) == PARAM_T_F32) || ((t) == PARAM_T_U32)) ? 4U : \
+     (((t) == PARAM_T_U16)) ? 2U : 1U)
+
+/* 编译期断言（typedef 负数组技巧，C89 可用；一行一条，__LINE__ 保证不重名） */
+#define PARAM_CAT2(a, b)          a##b
+#define PARAM_CAT(a, b)           PARAM_CAT2(a, b)
+#define PARAM_STATIC_ASSERT(cond) typedef char PARAM_CAT(param_chk_, __LINE__)[(cond) ? 1 : -1]
 
 /*=============================================================================
  * 外部接口

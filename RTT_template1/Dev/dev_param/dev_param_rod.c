@@ -20,14 +20,6 @@
 
 #if DEV_ENABLE_PARAM
 
-/* 快块存储区：0x78000 起逆序使用（sec 60 → 51，10 扇区） */
-#define ROD_SEC_START           (60U)
-#define ROD_SEC_END             (51U)
-
-/* 欠压保存延时 tick 数：Rod_Task 10ms 周期 × 2 ≈ 20ms（等刹车滑行稳定；
-   欠压掉电余量实测 270ms，flash 纯写 ~0.3ms、扇区满含擦 ~8ms，均在余量内） */
-#define ROD_SAVE_WAIT_TICKS     (2U)
-
 /* 编译期断言：记录尺寸不超引擎缓冲上限、4 字节对齐 */
 typedef char rod_rec_size_check[(sizeof(ParamStrokeRecord_t) <= PARAM_MAX_RECORD_SIZE) ? 1 : -1];
 typedef char rod_rec_align_check[((sizeof(ParamStrokeRecord_t) % 4U) == 0U) ? 1 : -1];
@@ -119,7 +111,7 @@ int32_t Dev_Param_RodInit(void)
                         s_mm_a, (unsigned long)s_rod_record.sequence_id);
         }
     } else {
-        MAIN_D("[RODP] init FAILED res=%d (keep RAM defaults)", (int)res);
+        RODP_PRINT("[RODP] init FAILED res=%d (keep RAM defaults)", (int)res);
     }
 
     s_rod_inited = 1U;
@@ -211,7 +203,7 @@ void Dev_Param_RodPollSave(void)
     s_rod_save_wait = 0U;
 
     if (s_rod_pos_ptr == NULL) {
-        MAIN_D("[RODP] poll save FAILED: no position instance");
+        RODP_PRINT("[RODP] poll save FAILED: no position instance");
         return;
     }
     /* 未校准（首次过流/限位校准前）：position_mm 是 0 起步的假基准漂移值，
@@ -229,7 +221,7 @@ int32_t Dev_Param_RodSave(float mm)
     int32_t res;
 
     if (s_rod_inited == 0U) {
-        MAIN_D("[RODP] save refused: not inited");
+        RODP_PRINT("[RODP] save refused: not inited");
         return PARAM_ERR_NOT_RDY;
     }
 
@@ -241,7 +233,7 @@ int32_t Dev_Param_RodSave(float mm)
                     s_mm_a, (unsigned long)s_rod_record.sequence_id,
                     (unsigned long)(s_rod_runtime.curr_addr - sizeof(ParamStrokeRecord_t)));
     } else {
-        MAIN_D("[RODP] save FAILED res=%d", (int)res);
+        RODP_PRINT("[RODP] save FAILED res=%d", (int)res);
     }
     return res;
 }
@@ -286,12 +278,12 @@ void Dev_Param_RodFillTest(float mm)
 void Dev_Param_RodShow(void)
 {
     Rod_MmFmt(s_rod_record.position_mm, s_mm_a, sizeof(s_mm_a));
-    MAIN_D("[RODP] rec: magic=0x%08lX seq=%lu erase=%lu stroke=%smm",
+    RODP_PRINT("[RODP] rec: magic=0x%08lX seq=%lu erase=%lu stroke=%smm",
            (unsigned long)s_rod_record.head_magic,
            (unsigned long)s_rod_record.sequence_id,
            (unsigned long)s_rod_record.erase_count,
            s_mm_a);
-    MAIN_D("[RODP] runtime: sec=%u addr=0x%08lX saves=%lu last_res=%d",
+    RODP_PRINT("[RODP] runtime: sec=%u addr=0x%08lX saves=%lu last_res=%d",
            (unsigned)s_rod_runtime.curr_sec, (unsigned long)s_rod_runtime.curr_addr,
            (unsigned long)s_rod_runtime.save_count, (int)s_rod_runtime.last_res);
 }

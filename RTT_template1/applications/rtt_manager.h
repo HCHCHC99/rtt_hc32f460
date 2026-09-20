@@ -31,6 +31,8 @@
 #define MOTOR_GPIO_PRINT_EN     0   /* 电机 GPIO：init/成对写方向（无 ramp 过程） */
 #define FLASH_PRINT_EN          0   /* Flash 驱动：擦/写/解锁流程（量大，默认关） */
 #define PARAM_PRINT_EN          1   /* 参数管理：加载/保存/默认值 */
+#define PARAM_WARNNING_PRINT_EN 1   /* 参数异常告警：param_set 越界拒收/上电加载越界（仅出错时打印，正常零输出） */
+#define RODP_PRINT_EN           1   /* 快块B推杆行程：加载/保存/错误（[RODP]） */
 /* ===================== 各模块打印宏封装 ===================== */
 #if SYS_STATE_PRINT_EN
 #define SYS_STATE_PRINT(fmt, ...)   MAIN_D("[SYS_STATE] " fmt, ##__VA_ARGS__)
@@ -126,6 +128,23 @@
 #define PARAM_PRINT(fmt, ...)       MAIN_D("[PARAM] " fmt, ##__VA_ARGS__)
 #else
 #define PARAM_PRINT(fmt, ...)       ((void)0)
+#endif
+
+#if PARAM_WARNNING_PRINT_EN
+/* [PARAM_WARNNING]：参数异常专用告警（仅检查发现错误时调用，正常路径零输出）；
+   自带上下分隔线（LOG_CH 末尾自动补 \r\n），便于在日志流中一眼定位 */
+#define PARAM_WARNNING(fmt, ...) \
+    MAIN_D("========================================\r\n" \
+           "[PARAM_WARNNING] " fmt "\r\n" \
+           "========================================", ##__VA_ARGS__)
+#else
+#define PARAM_WARNNING(fmt, ...)    ((void)0)
+#endif
+
+#if RODP_PRINT_EN
+#define RODP_PRINT(fmt, ...)        MAIN_D("[RODP] " fmt, ##__VA_ARGS__)
+#else
+#define RODP_PRINT(fmt, ...)        ((void)0)
 #endif
 
 #if RTT_PRINTF_EN

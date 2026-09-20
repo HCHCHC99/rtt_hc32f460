@@ -1,6 +1,7 @@
 # Flash 存储模块设计（移植版·双实例）
 
 > 记录日期：2026-09-08（同日升级双实例并重构保存链路：Rod_Task 驱动 + 依赖注入）
+> 更新：2026-09-20 A 块参数改**表驱动存储**（新增 §3.4）：记录 44B→84B，新增 param_list/param_set 命令与越界校验；**布局变更，首次烧录需 param_erase**
 > 状态：✅ 已实施；A 块扇区内循环 + 磨损换扇区已实测通过；B 块待上板验证
 > 来源：裸机工程 `D:\HB_chuchai_v.6.0.4`（hc32f46x_flash / param_manager / App_Params），芯片同为 HC32F460
 > 流程图：`ob/Flash慢块A流程图.canvas`、`ob/Flash快块B流程图.canvas`（Obsidian）
@@ -30,7 +31,8 @@
 applications/main.c        上电调 Dev_Param_Init()（一次性，A/B 扫描加载的编排入口）
         │
 Dev/dev_param/             应用层：双实例
-  ├─ dev_param.c           慢块 A：ParamRecord_t(44B) + 默认值 + 应用到 g_volt_cfg/g_cur_cfg
+  ├─ dev_param.c           慢块 A：ParamRecord_t(84B) 表驱动（s_param_table 单点描述，
+  │                        defaults/apply/save/show 统一遍历，见 §3.4）
   │                        （兼编排角色：Init/EraseAll/param_show 统一调度 A+B）
   └─ dev_param_rod.c       快块 B：ParamStrokeRecord_t(24B) + 保存链路自包含
                            （Request/Poll 状态机）+ 恢复应用；不依赖 mySystem
@@ -50,7 +52,7 @@ hc32_ll_efm.c（DDL）        已在构建中（无需改 .cproject）
 
 | 实例 | 扇区 | 地址范围 | 记录大小 | 追加次数/擦 | 擦寿命/扇区 | 保存总寿命 |
 |---|---|---|---|---|---|---|
-| **A 慢块**（配置） | 62→61（2 个） | 0x7A000~0x7FFFF | 44B | 186 | 1 万擦 | 186 万/扇区 × 2 |
+| **A 慢块**（配置） | 62→61（2 个） | 0x7A000~0x7FFFF | 84B | 97 | 1 万擦 | 97 万/扇区 × 2 |
 | **B 快块**（行程） | 60→51（10 个） | 0x66000~0x79FFF | 24B | **341** | 1 万擦 | 341 万/扇区 × 10 |
 
 - 扇区号 = 绝对地址 / 0x2000（`PARAM_SECTOR_SIZE`）；两块无重叠；app 区可用至 0x65FFF（416KB），当前固件 ~82KB
@@ -78,6 +80,51 @@ hc32_ll_efm.c（DDL）        已在构建中（无需改 .cproject）
 - **上电扫描**（Param_Init）：从 secStart 向 secEnd 逐扇区扫描，魔数 + CRC 全通过视为有效块，**seq 最大者加载**；全无效则写默认值到 secStart
 - **写失败重试**：最多 7 次，失败后写指针前移跳过坏点
 
+### 3.4 A 块参数表驱动存储（2026-09-20）
+
+**思路**：重构前 A 块加一个参数要同步改 5 处（ParamRecord_t 字段 / 默认值宏 / defaults 赋值 / apply 镜像 / save 回写 / show 打印），全是重复模式，漏改无任何告警。改为 `s_param_table[]` 单点描述：每参数一行 `ParamDesc_t`，defaults/apply/save/show 四处遍历统一走表。
+
+**加参数 = 5 处机械动作**：
+1. dev_param.h 默认值宏 `XXX_DFT` + 限值宏 `XXX_MIN/MAX`
+2. `ParamRecord_t` 加字段
+3. 消费结构加字段（或走钩子）
+4. 表加一行
+5. 表后编译期断言加一行
+
+**ParamDesc_t 字段语义**：
+
+| 字段 | 说明 |
+|---|---|
+| name | msh 参数名（param_set/param_list 用；拼错只能运行时发现，param_list 可查） |
+| rec_off | 记录内偏移，一律 `offsetof(ParamRecord_t, 字段)`，禁手写数字 |
+| ram_base / ram_off | 消费 RAM 镜像目标；`RT_NULL` 或 `&g_param_record` = **自镜像**（无独立消费 RAM，当前值就存在记录里，生效走钩子） |
+| type | `PARAM_T_F32/U32/U16/U8`（dev_param.h），宽度由 `PARAM_TYPE_SIZE` 宏唯一决定 |
+| def_f / def_u | 默认值（SetDefaults 回调经表填入） |
+| min / max | param_set 允许范围（含边界），0/0=不限；**只做单参数上下限，跨字段约束（欠压<过压-迟滞、校准窗≤stroke）不校验** |
+| apply_hook | 可选应用钩子，见下 |
+
+**apply_hook（应用钩子）**：镜像搞不定的两类参数用：
+- 消费变量是其他模块 static，拿不到地址 → 经公开 setter 应用（`motor_seq` → `Dev_MotorGpio_SetDirInvert()`）
+- 自镜像组改值后要重算派生量 → 统一挂 `Param_HookRodApply`（9 个 rod 参数 → `Dev_Param_RodApply()` 写 RodPosition_t 并重算 pulse_to_mm）
+- **必须幂等**：多行挂同一钩子会被重复调用（rod 组 9 行一次 Apply 连跑 9 次），钩子只允许"按当前值设状态"，禁止累加
+
+**应用链（两阶段，`Param_TableApply`）**：阶段 1 record→消费 RAM 字段级镜像（size≤4 单指令原子，线程单写者）；阶段 2 跑钩子。触发点三个：上电 `Dev_Param_Init` 加载后 / `param_erase` 后 / `param_set` 热改即时。
+时序契约：上电首次 Apply 时 rod 模块未 init，`Dev_Param_RodApply` 内 `s_rod_inited` 守卫直接跳过，实际应用由 `App_Model_Init` 末尾补做（与表驱动前时序一致）。
+
+**三道防线**：
+1. **编译期**：26 条 `PARAM_STATIC_ASSERT`（18 记录字段 + 7 消费字段 + 1 变量）逐行核对"表行 type 声明 ↔ 字段实际宽度"——type 标错、字段改名/改宽直接编译失败；另有记录 ≤256B 引擎上限 + 4 字节对齐两条老断言
+2. **param_set 运行时**：越界**拒收**并打印 `[PARAM_WARNNING]`（自带 `====` 分隔线，仅出错时输出，开关 `PARAM_WARNNING_PRINT_EN`）
+3. **上电加载**：Flash 旧值越界**仅告警不裁剪**（提示 param_erase），不替用户做主
+
+**MSH 命令**：`param_list`（当前值/默认值/限值一行一参）、`param_set <name> <value>`（按名热改 → 钩子即时生效，`param_save` 持久化）。
+
+**注意点 / 坑**：
+- **改 ParamRecord_t 布局 = 换存储格式**：旧记录 CRC 不过 → 上电自动走默认值路径，不会加载错值；但本次 44B→84B 后首次烧录必须 `param_erase` 清掉旧扇区数据
+- 表驱动后断点调试不如直写直观：追 apply/save 行为要进表遍历跳一层间接
+- `PARAM_TABLE_NUM` 是唯一留在 .c 的宏（依赖 static 表定义，无法上移 .h——开发规范 §11 特例）
+- **编译顺序**：`Param_SetDefaults` 引用 `PARAM_TABLE_NUM`（宏依赖 `s_param_table`），函数定义必须放在表之后，否则 implicit declaration / undeclared（已踩，见 §八 第 8 条）
+- volt/cur 组仍走"独立 RAM 镜像"路线：Save 时表反向回写 record（`Param_TableSave`），自镜像组天然跳过
+
 ---
 
 ## 四、RTOS / 构建适配决策
@@ -88,7 +135,7 @@ hc32_ll_efm.c（DDL）        已在构建中（无需改 .cproject）
 | 2 | 裸机 `__disable_irq()/__enable_irq()` | `rt_hw_interrupt_disable()/enable()` | RTOS 下无条件开中断破坏嵌套状态 |
 | 3 | 栈上 `tempBuf[256]` 硬编码 | 静态缓冲 + paramSize 上限 + 编译期断言 | 结构体超 256B 爆栈，编译期拦截 |
 | 4 | `.ramfunc` 段 | **去除** | BUS_HOLD 下擦/写期间 CPU 取指自动停等，无需 ramfunc |
-| 5 | 裸机打印宏 | `rtt_manager.h` 的 `FLASH_PRINT`（关）/ `PARAM_PRINT`（开） | A 块 `[PARAM]` 前缀、B 块 `[RODP]` 前缀 |
+| 5 | 裸机打印宏 | `rtt_manager.h` 的 `FLASH_PRINT`（关）/ `PARAM_PRINT`+`RODP_PRINT`（开）/ `PARAM_WARNNING`（开，仅出错时） | A 块 `[PARAM]`、B 块 `[RODP]` 前缀；告警 `[PARAM_WARNNING]` 自带分隔线 |
 
 **解锁流程**（hc32_drv_flash.c 内部完成）：擦/写前 `EFM_REG_Unlock → EFM_FWMC_Cmd(ENABLE) → EFM_SetBusStatus(EFM_BUS_HOLD) → EFM_ClearStatus`；操作后 `EFM_ClearStatus → EFM_FWMC_Cmd(DISABLE) → EFM_REG_Lock`。
 
@@ -101,7 +148,7 @@ hc32_ll_efm.c（DDL）        已在构建中（无需改 .cproject）
 | 接口 | 块 | 说明 |
 |---|---|---|
 | `Dev_Param_Init()` | A+B | 上电扫 Flash 加载并应用（main 调一次，内部有一次性保护；内部调 `Dev_Param_RodInit`） |
-| `Dev_Param_Save()` | A | 从 `g_volt_cfg`/`g_cur_cfg` 同步到记录并写入（电机运行中拒绝） |
+| `Dev_Param_Save()` | A | 表驱动反向镜像（消费 RAM → 记录，`Param_TableSave`）并写入（电机运行中拒绝） |
 | `Dev_Param_EraseAll()` | A+B | 擦除全部参数扇区并重写默认值 |
 | `Dev_Param_RodSave(mm)` | B | 保存推杆行程（PollSave 延时到期后取值调用；也可直接调用） |
 | `Dev_Param_RodGet(&mm)` | B | 读取 B 块行程值 |
@@ -111,7 +158,7 @@ hc32_ll_efm.c（DDL）        已在构建中（无需改 .cproject）
 | `Dev_Param_RodEraseAll()` | B | 擦 B 全部扇区重写默认值 |
 | `Dev_Param_FillTest()` / `Dev_Param_RodFillTest(mm)` | A/B | 测试：连续保存填满当前扇区（B 需传行程值） |
 
-**MSH 命令**：`param_show`（A+B 两块状态）/ `param_save`（A）/ `param_erase`（A+B）
+**MSH 命令**：`param_show`（A+B 两块状态）/ `param_list`（A 块参数：当前值/默认值/限值）/ `param_set <name> <value>`（按名热改，越界拒收）/ `param_save`（A）/ `param_erase`（A+B）/ `dir_set <hall 0/1> <motor 0/1>`（相序设置并保存）
 
 ---
 
@@ -188,3 +235,4 @@ Dev_Param_RodPollSave(): 计 2 个 tick ≈ 20ms（等刹车滑行稳定，零�
 5. **构建清单**：实际构建以 RT-Thread Studio 为准（`Dev/dev_param/SConscript` 为 `Glob('*.c')`，新 .c 自动发现）；Keil 副本工程用户不维护（打不开）。
 6. **位置恢复的固有误差**：保存的位置略早于最终停住点（刹车滑行段未记账）；20ms tick 延时已缩小该误差，增量记账模式下偏差仅影响初始基准。
 7. **依赖注入模式**：dev_param_rod.c 对位置模块只有"一个实例指针"依赖（`RodApply` 注入），对 `mySystem` 零依赖；测试钩子一律传参。
+8. **表驱动编译顺序**（2026-09-20 踩）：`Param_SetDefaults` 引用 `PARAM_TABLE_NUM`（宏依赖 `s_param_table` 定义），函数必须放在表之后，否则 implicit declaration + conflicting types。当时因 include 路径报错中止编译，该问题**延迟两天才暴露**——教训：重构后必须完成一次全量编译并确认 0E 再收工，"改完了"≠"编译过了"。
