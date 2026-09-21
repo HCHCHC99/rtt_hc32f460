@@ -82,6 +82,7 @@ extern ParamRecord_t g_param_record;
 #define PARAM_ROD_MAGIC_HEAD    0x66AA66AAU
 #define PARAM_ROD_MAGIC_TAIL    0xAA66AA66U
 
+
 /* 快块记录：头尾 20B（引擎必需）+ 行程 float 4B = 24B，单扇区 8192/24 ≈ 341 次/擦 */
 #pragma pack(4)
 typedef struct {
@@ -113,8 +114,8 @@ typedef struct {
 #define VOL_OVER_MS_DFT             (12U)     /* 过压确认窗 ms：连续超限 N ms 才判故障（0=单点立即） */
 #define VOL_UNDER_MS_DFT            (12U)     /* 欠压确认窗 ms：连续低于阈值 N ms 才判故障（0=单点立即） */
 
-#define CUR_OVER_CUR_TH_MA_DFT      (1000.0f) /* 过流阈值 mA（直线推杆堵转判定，1.0A） */
-#define CUR_OVER_WINDOW_MS_DFT      (30U)     /* 过流判定窗口 ms（连续 30ms 超阈值才判过流） */
+#define CUR_OVER_CUR_TH_MA_DFT      (2700.0f) /* 过流阈值 mA（直线推杆堵转判定，1.0A） */
+#define CUR_OVER_WINDOW_MS_DFT      (10U)     /* 过流判定窗口 ms（连续 30ms 超阈值才判过流） */
 #define CUR_BLOCK_MS_DFT            (30U)     /* 方向变化过流屏蔽 ms（停止→正/反转、换向浪涌期不判定，0=不屏蔽） */
 
 /* 软限位校准窗口默认（直线推杆模式，单位 mm；窄窗形式，语义见 dev_rod_position.h）：
@@ -122,14 +123,14 @@ typedef struct {
    c=d=24：pos>=24mm 允许 FWD 过流校准（校准成功置 25mm） */
 #define ROD_CALIB_WIN_A_DFT         (1.0f)    /* 下限窗口下界 a（mm）：a==b 时 pos<=a 判下限窗 */
 #define ROD_CALIB_WIN_B_DFT         (1.0f)    /* 下限窗口上界 b（mm） */
-#define ROD_CALIB_WIN_C_DFT         (24.0f)   /* 上限窗口下界 c（mm）：c==d 时 pos>=c 判上限窗 */
-#define ROD_CALIB_WIN_D_DFT         (24.0f)   /* 上限窗口上界 d（mm） */
+#define ROD_CALIB_WIN_C_DFT         (29.0f)   /* 上限窗口下界 c（mm）：c==d 时 pos>=c 判上限窗 */
+#define ROD_CALIB_WIN_D_DFT         (29.0f)   /* 上限窗口上界 d（mm） */
 #define ROD_STOP_MARGIN_DFT         (0.5f)    /* 停止裕量（mm，位置停车：pos>=行程-裕量=24.5mm） */
 
 /* 推杆机械参数默认（直线推杆模式，数值单位=mm；A 块存储，Dev_Param_RodApply 应用）：
    每脉冲位移 = lead/(ratio*pulses) = 3/(30.54*12) ≈ 0.008194mm/脉冲；行程 25mm ≈ 3054 脉冲
    双霍尔三对极：脉冲/电机转 = 3对极 × 2路霍尔 × 双沿 = 12（与 MOTOR_HALL 自动口径一致） */
-#define ROD_STROKE_DFT              (25.0f)   /* 总行程（mm） */
+#define ROD_STROKE_DFT              (30.0f)   /* 总行程（mm） */
 #define ROD_REDUCTION_RATIO_DFT     (30.54f)  /* 减速比：电机轴转 N 圈丝杆转 1 圈 */
 #define ROD_HALL_PULSES_DFT         (12.0f)   /* 电机轴每转霍尔脉冲数（双霍尔三对极双沿） */
 #define ROD_SCREW_LEAD_DFT          (3.0f)    /* 丝杆导程（mm/圈）：换算分子，非取模 */
