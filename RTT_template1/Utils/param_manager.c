@@ -251,10 +251,33 @@ int32_t Param_Init(const Param_Config_t *pConfig,
         }
 
         pRuntime->curr_sec  = best_sec;
-        pRuntime->curr_addr = best_addr;
+        pRuntime->curr_addr = best_addr + pConfig->paramSize;   /* 下一空位（非记录本身：
+                                    首次保存直接写空位，省掉一次必然失败的覆写重试） */
 
         PARAM_PRINT("Param load SUCCESS: seq=%lu, addr=0x%08lX, sec=%lu",
                     (unsigned long)max_seq, (unsigned long)best_addr, (unsigned long)best_sec);
+
+        /* 预擦除：剩余不足以再存一次 → 上电满电时刻就地擦除并回写当前记录到扇区头，
+           把边界擦除从"掉电保存途中"挪到"上电安静期"。本条件与 Param_Save 溢出条件
+           互补：预擦除未触发的上电，之后首次保存必然装得下——正常"一次掉电一存"工况
+           下，掉电途中不再触发 8ms 擦除。擦除失败则保留原指针，下次保存走 Param_Save
+           原地擦除分支兜底。 */
+        if (pRuntime->curr_addr + pConfig->paramSize > (best_sec + 1) * PARAM_SECTOR_SIZE) {
+            uint32_t secBase = best_sec * PARAM_SECTOR_SIZE;
+
+            if (Internal_Erase(secBase) == PARAM_OK) {
+                SetField32(pConfig->pParamBuf, pConfig->eraseCntOffset,
+                           GetField32(pConfig->pParamBuf, pConfig->eraseCntOffset) + 1U);
+                SetField32(pConfig->pParamBuf, pConfig->checksumOffset,
+                           CalcParamCRC(pConfig->pParamBuf, pConfig->paramSize,
+                                        pConfig->checksumOffset));
+                (void)Internal_WriteBuffer(secBase, (const uint32_t *)pConfig->pParamBuf,
+                                           paramWords);
+                pRuntime->curr_addr = secBase + pConfig->paramSize;
+                PARAM_PRINT("Param pre-erase: sec=%lu rewritten at head, next=0x%08lX",
+                            (unsigned long)best_sec, (unsigned long)pRuntime->curr_addr);
+            }
+        }
     } else {
         PARAM_PRINT("No valid param block, use defaults and write to Flash");
         pSetDefaults();

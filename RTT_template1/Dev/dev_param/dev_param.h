@@ -112,10 +112,10 @@ typedef struct {
 #define VOL_HYST_DFT                (1.0f)    /* 迟滞回差 V */
 #define VOL_RECOVER_DELAY_MS_DFT    (25U)    /* 电压恢复延时 ms */
 #define VOL_OVER_MS_DFT             (12U)     /* 过压确认窗 ms：连续超限 N ms 才判故障（0=单点立即） */
-#define VOL_UNDER_MS_DFT            (12U)     /* 欠压确认窗 ms：连续低于阈值 N ms 才判故障（0=单点立即） */
+#define VOL_UNDER_MS_DFT            (1U)     /* 欠压确认窗 ms：连续低于阈值 N ms 才判故障（0=单点立即） */
 
-#define CUR_OVER_CUR_TH_MA_DFT      (2700.0f) /* 过流阈值 mA（直线推杆堵转判定，1.0A） */
-#define CUR_OVER_WINDOW_MS_DFT      (10U)     /* 过流判定窗口 ms（连续 30ms 超阈值才判过流） */
+#define CUR_OVER_CUR_TH_MA_DFT      (1000.0f) /* 过流阈值 mA（直线推杆堵转判定，1.0A） */
+#define CUR_OVER_WINDOW_MS_DFT      (7U)     /* 过流判定窗口 ms（连续 30ms 超阈值才判过流） */
 #define CUR_BLOCK_MS_DFT            (30U)     /* 方向变化过流屏蔽 ms（停止→正/反转、换向浪涌期不判定，0=不屏蔽） */
 
 /* 软限位校准窗口默认（直线推杆模式，单位 mm；窄窗形式，语义见 dev_rod_position.h）：
