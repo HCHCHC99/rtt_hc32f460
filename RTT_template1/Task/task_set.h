@@ -13,7 +13,7 @@
 
 /* ===================== 线程栈大小统一管理（唯一权威来源） ===================== */
 #define TASK_STACK_MAIN     (4096U)   /* main 主线程：初始化 + 1s 采样打印 + MSH */
-#define TASK_STACK_SYS_SM   (1024U)  /* sys_sm 系统状态机事件线程（InitAll 含仲裁复位+RTT 打印，256 太紧） */
+#define TASK_STACK_SYS_SM   (2048U)  /* sys_sm 系统状态机事件线程（InitAll 含仲裁复位+RTT 打印，256 太紧） */
 #define TASK_STACK_DEV      (512U)   /* dev 设备管理线程 */
 #define TASK_STACK_ROD      (2048U)  /* rod 推杆位置/状态（含 float 状态机 + Arb_GetData 约360B 局部拷贝 + RTT 打印；256B 曾栈溢出写坏 TCB，见 md_record/INIT卡死-线程饿死与栈溢出.md） */
 #define TASK_STACK_DI       (2048U)  /* di DI 采集（Polarity_Scan 链 + RTT printf 峰值，256B 曾栈溢出） */

@@ -111,21 +111,21 @@ typedef struct {
 #define VOL_UNDER_TH_DFT            (20.0f)   /* 欠压阈值 V（必须明显高于 VOL_OFFSET 1.2V 偏置，否则无 24V 时 SeenValid 误判） */
 #define VOL_HYST_DFT                (1.0f)    /* 迟滞回差 V */
 #define VOL_RECOVER_DELAY_MS_DFT    (25U)    /* 电压恢复延时 ms */
-#define VOL_OVER_MS_DFT             (12U)     /* 过压确认窗 ms：连续超限 N ms 才判故障（0=单点立即） */
+#define VOL_OVER_MS_DFT             (10U)     /* 过压确认窗 ms：连续超限 N ms 才判故障（0=单点立即） */
 #define VOL_UNDER_MS_DFT            (1U)     /* 欠压确认窗 ms：连续低于阈值 N ms 才判故障（0=单点立即） */
 
-#define CUR_OVER_CUR_TH_MA_DFT      (1000.0f) /* 过流阈值 mA（直线推杆堵转判定，1.0A） */
+#define CUR_OVER_CUR_TH_MA_DFT      (10000.0f) /* 过流阈值 mA（直线推杆堵转判定，1.0A） */
 #define CUR_OVER_WINDOW_MS_DFT      (7U)     /* 过流判定窗口 ms（连续 30ms 超阈值才判过流） */
 #define CUR_BLOCK_MS_DFT            (30U)     /* 方向变化过流屏蔽 ms（停止→正/反转、换向浪涌期不判定，0=不屏蔽） */
 
 /* 软限位校准窗口默认（直线推杆模式，单位 mm；窄窗形式，语义见 dev_rod_position.h）：
    a=b=1：pos<=1mm 允许 REV 过流校准（校准成功置 0mm）
    c=d=24：pos>=24mm 允许 FWD 过流校准（校准成功置 25mm） */
-#define ROD_CALIB_WIN_A_DFT         (1.0f)    /* 下限窗口下界 a（mm）：a==b 时 pos<=a 判下限窗 */
-#define ROD_CALIB_WIN_B_DFT         (1.0f)    /* 下限窗口上界 b（mm） */
-#define ROD_CALIB_WIN_C_DFT         (29.0f)   /* 上限窗口下界 c（mm）：c==d 时 pos>=c 判上限窗 */
-#define ROD_CALIB_WIN_D_DFT         (29.0f)   /* 上限窗口上界 d（mm） */
-#define ROD_STOP_MARGIN_DFT         (0.5f)    /* 停止裕量（mm，位置停车：pos>=行程-裕量=24.5mm） */
+#define ROD_CALIB_WIN_A_DFT         (31.0f)    /* 下限窗口下界 a（mm）：a==b 时 pos<=a 判下限窗 */
+#define ROD_CALIB_WIN_B_DFT         (31.0f)    /* 下限窗口上界 b（mm） */
+#define ROD_CALIB_WIN_C_DFT         (29.5f)   /* 上限窗口下界 c（mm）：c==d 时 pos>=c 判上限窗 */
+#define ROD_CALIB_WIN_D_DFT         (29.5f)   /* 上限窗口上界 d（mm） */
+#define ROD_STOP_MARGIN_DFT         (0.2f)    /* 停止裕量（mm，位置停车：pos>=行程-裕量=24.5mm） */
 
 /* 推杆机械参数默认（直线推杆模式，数值单位=mm；A 块存储，Dev_Param_RodApply 应用）：
    每脉冲位移 = lead/(ratio*pulses) = 3/(30.54*12) ≈ 0.008194mm/脉冲；行程 25mm ≈ 3054 脉冲
@@ -155,8 +155,8 @@ typedef struct {
 #define VOL_OVER_MS_MAX             (100U)    /* 上限兼顾欠压掉电链路：确认窗+急停+存行程须 << 270ms 掉电余量 */
 #define VOL_UNDER_MS_MIN            (0U)      /* 欠压确认窗限值 ms（0=单点立即） */
 #define VOL_UNDER_MS_MAX            (100U)
-#define CUR_OVER_CUR_TH_MA_MIN      (100.0f)  /* 过流阈值限值 mA */
-#define CUR_OVER_CUR_TH_MA_MAX      (5000.0f)
+#define CUR_OVER_CUR_TH_MA_MIN      (0.0f)  /* 过流阈值限值 mA */
+#define CUR_OVER_CUR_TH_MA_MAX      (10000.0f)
 #define CUR_OVER_WINDOW_MS_MIN      (5U)      /* 过流判定窗口限值 ms */
 #define CUR_OVER_WINDOW_MS_MAX      (200U)
 #define CUR_BLOCK_MS_MIN            (0U)      /* 方向变化屏蔽限值 ms（0=不屏蔽） */
